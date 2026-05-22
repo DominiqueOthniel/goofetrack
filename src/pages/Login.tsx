@@ -15,12 +15,19 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const { isSubmitting: loading, withGuard } = useSubmitGuard();
-  const { user, login: doLogin } = useAuth();
+  const { user, users, login: doLogin } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
     if (user) navigate('/', { replace: true });
   }, [user, navigate]);
+
+  useEffect(() => {
+    if (!users.length) return;
+    if (!users.some((u) => u.login === selectedUser)) {
+      setSelectedUser(users[0].login);
+    }
+  }, [selectedUser, users]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,7 +50,10 @@ export default function Login() {
     });
   };
 
-  const selectedOption = LOGIN_USER_OPTIONS.find(o => o.login === selectedUser);
+  const selectedSummary = users.find(o => o.login === selectedUser);
+  const selectedOption = selectedSummary
+    ? LOGIN_USER_OPTIONS.find(o => o.login === selectedSummary.role)
+    : LOGIN_USER_OPTIONS.find(o => o.login === selectedUser);
 
   return (
     <div className="min-h-screen flex items-center justify-center relative overflow-hidden bg-[#0f1117]">
@@ -93,16 +103,19 @@ export default function Login() {
                   <SelectValue placeholder="Choisir un utilisateur" />
                 </SelectTrigger>
                 <SelectContent className="bg-[#1a1d2e] border-white/10">
-                  {LOGIN_USER_OPTIONS.map((opt) => (
+                  {users.map((opt) => {
+                    const roleOption = LOGIN_USER_OPTIONS.find(o => o.login === opt.role);
+                    return (
                     <SelectItem
                       key={opt.login}
                       value={opt.login}
-                      textValue={opt.label}
+                      textValue={opt.login}
                       className="text-white/80 focus:bg-violet-500/20 focus:text-white"
                     >
-                      {opt.label}
+                      {opt.login} <span className="text-white/45">({roleOption?.label ?? opt.role})</span>
                     </SelectItem>
-                  ))}
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </div>

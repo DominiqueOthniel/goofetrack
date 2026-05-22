@@ -18,7 +18,7 @@ import {
 } from '@/lib/sync-utils';
 import { cn } from '@/lib/utils';
 import { EMOJI } from '@/lib/emoji-palette';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth, UserRole } from '@/contexts/AuthContext';
 import { adminApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { getCaisseSoldeActuel, getTotalBanqueDisponible } from '@/lib/bank-local';
@@ -26,13 +26,21 @@ import { getCaisseSoldeActuel, getTotalBanqueDisponible } from '@/lib/bank-local
 export default function Dashboard() {
   const navigate = useNavigate();
   const { trucks, trips, parcelExpeditions, expenses, invoices, drivers, refreshTrucks, refreshDrivers, refreshTrips, refreshParcelExpeditions, refreshExpenses, refreshInvoices, refreshThirdParties, refreshPersonnel } = useApp();
-  const { user, users, changeUserPassword } = useAuth();
+  const { user, users, createUser, changeUserPassword, changeOwnPassword } = useAuth();
   const [isBackingUp, setIsBackingUp] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
   const [isPwdDialogOpen, setIsPwdDialogOpen] = useState(false);
+  const [isOwnPwdDialogOpen, setIsOwnPwdDialogOpen] = useState(false);
   const [targetLogin, setTargetLogin] = useState('admin');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [createLogin, setCreateLogin] = useState('');
+  const [createRole, setCreateRole] = useState<UserRole>('comptable');
+  const [createPassword, setCreatePassword] = useState('');
+  const [createConfirmPassword, setCreateConfirmPassword] = useState('');
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [ownNewPassword, setOwnNewPassword] = useState('');
+  const [ownConfirmPassword, setOwnConfirmPassword] = useState('');
   const restoreFileRef = useRef<HTMLInputElement>(null);
 
   const handleBackup = async () => {
@@ -106,6 +114,56 @@ export default function Dashboard() {
       setNewPassword('');
       setConfirmPassword('');
       setIsPwdDialogOpen(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Erreur mise à jour mot de passe');
+    }
+  };
+
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!createLogin.trim()) {
+      toast.error('Entrez un login.');
+      return;
+    }
+    if (createPassword.length < 6) {
+      toast.error('Le mot de passe doit contenir au moins 6 caractères.');
+      return;
+    }
+    if (createPassword !== createConfirmPassword) {
+      toast.error('Les mots de passe ne correspondent pas.');
+      return;
+    }
+
+    try {
+      await createUser(createLogin, createRole, createPassword);
+      toast.success(`Utilisateur ${createLogin.trim().toLowerCase()} créé.`);
+      setCreateLogin('');
+      setCreateRole('comptable');
+      setCreatePassword('');
+      setCreateConfirmPassword('');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Erreur création utilisateur');
+    }
+  };
+
+  const handleChangeOwnPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (ownNewPassword.length < 6) {
+      toast.error('Le nouveau mot de passe doit contenir au moins 6 caractères.');
+      return;
+    }
+    if (ownNewPassword !== ownConfirmPassword) {
+      toast.error('Les mots de passe ne correspondent pas.');
+      return;
+    }
+
+    try {
+      await changeOwnPassword(currentPassword, ownNewPassword);
+      toast.success('Votre mot de passe a été mis à jour.');
+      setCurrentPassword('');
+      setOwnNewPassword('');
+      setOwnConfirmPassword('');
+      setIsOwnPwdDialogOpen(false);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Erreur mise à jour mot de passe');
     }
@@ -296,6 +354,66 @@ export default function Dashboard() {
             <Badge variant="outline" className="text-xs px-2 py-1.5 flex sm:hidden">
               {EMOJI.date} {new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
             </Badge>
+            {user && (
+              <Dialog open={isOwnPwdDialogOpen} onOpenChange={setIsOwnPwdDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-1.5 sm:gap-2 text-xs sm:text-sm">
+                    <CreditCard className="h-4 w-4" />
+                    Mon mot de passe
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="w-[95vw] max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Changer mon mot de passe</DialogTitle>
+                  </DialogHeader>
+                  <form onSubmit={handleChangeOwnPassword} className="space-y-4">
+                    <div className="rounded-lg border bg-muted/40 px-3 py-2 text-sm">
+                      Compte connecté : <span className="font-semibold">{user.login}</span>
+                    </div>
+                    <div>
+                      <Label htmlFor="current-password">Mot de passe actuel</Label>
+                      <Input
+                        id="current-password"
+                        type="password"
+                        value={currentPassword}
+                        onChange={(e) => setCurrentPassword(e.target.value)}
+                        className="mt-1"
+                        autoComplete="current-password"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="own-new-password">Nouveau mot de passe</Label>
+                      <Input
+                        id="own-new-password"
+                        type="password"
+                        value={ownNewPassword}
+                        onChange={(e) => setOwnNewPassword(e.target.value)}
+                        placeholder="Minimum 6 caractères"
+                        className="mt-1"
+                        autoComplete="new-password"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="own-confirm-password">Confirmer le nouveau mot de passe</Label>
+                      <Input
+                        id="own-confirm-password"
+                        type="password"
+                        value={ownConfirmPassword}
+                        onChange={(e) => setOwnConfirmPassword(e.target.value)}
+                        className="mt-1"
+                        autoComplete="new-password"
+                      />
+                    </div>
+                    <div className="flex justify-end gap-2">
+                      <Button type="button" variant="outline" onClick={() => setIsOwnPwdDialogOpen(false)}>
+                        Annuler
+                      </Button>
+                      <Button type="submit">Mettre à jour</Button>
+                    </div>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            )}
             {user?.role === 'admin' && (
               <>
                 <Button
@@ -330,57 +448,119 @@ export default function Dashboard() {
                   <DialogTrigger asChild>
                     <Button variant="outline" size="sm" className="gap-1.5 sm:gap-2 text-xs sm:text-sm">
                       <CreditCard className="h-4 w-4" />
-                      Mots de passe
+                      Utilisateurs
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="w-[95vw] max-w-md">
+                  <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
-                      <DialogTitle>Gestion des mots de passe (Admin)</DialogTitle>
+                      <DialogTitle>Gestion des utilisateurs</DialogTitle>
                     </DialogHeader>
-                    <form onSubmit={handleChangePassword} className="space-y-4">
-                      <div>
-                        <Label>Utilisateur</Label>
-                        <Select value={targetLogin} onValueChange={setTargetLogin}>
-                          <SelectTrigger className="mt-1">
-                            <SelectValue placeholder="Choisir un utilisateur" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {users.map((u) => (
-                              <SelectItem key={u.login} value={u.login}>
-                                {u.login} ({u.role})
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div>
-                        <Label htmlFor="new-password">Nouveau mot de passe</Label>
-                        <Input
-                          id="new-password"
-                          type="password"
-                          value={newPassword}
-                          onChange={(e) => setNewPassword(e.target.value)}
-                          placeholder="Minimum 6 caractères"
-                          className="mt-1"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="confirm-password">Confirmer le mot de passe</Label>
-                        <Input
-                          id="confirm-password"
-                          type="password"
-                          value={confirmPassword}
-                          onChange={(e) => setConfirmPassword(e.target.value)}
-                          className="mt-1"
-                        />
-                      </div>
-                      <div className="flex justify-end gap-2">
-                        <Button type="button" variant="outline" onClick={() => setIsPwdDialogOpen(false)}>
-                          Annuler
-                        </Button>
-                        <Button type="submit">Enregistrer</Button>
-                      </div>
-                    </form>
+                    <div className="grid gap-6 md:grid-cols-2">
+                      <form onSubmit={handleCreateUser} className="space-y-4 rounded-xl border p-4">
+                        <div>
+                          <h3 className="font-semibold">Créer un utilisateur</h3>
+                          <p className="text-xs text-muted-foreground">
+                            Exemples : comptable1, comptable2, gestionnaire2.
+                          </p>
+                        </div>
+                        <div>
+                          <Label htmlFor="create-login">Login</Label>
+                          <Input
+                            id="create-login"
+                            value={createLogin}
+                            onChange={(e) => setCreateLogin(e.target.value)}
+                            placeholder="comptable1"
+                            className="mt-1"
+                            autoComplete="username"
+                          />
+                        </div>
+                        <div>
+                          <Label>Catégorie</Label>
+                          <Select value={createRole} onValueChange={(value) => setCreateRole(value as UserRole)}>
+                            <SelectTrigger className="mt-1">
+                              <SelectValue placeholder="Choisir une catégorie" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="admin">Administrateur</SelectItem>
+                              <SelectItem value="gestionnaire">Gestionnaire</SelectItem>
+                              <SelectItem value="comptable">Comptable</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label htmlFor="create-password">Mot de passe</Label>
+                          <Input
+                            id="create-password"
+                            type="password"
+                            value={createPassword}
+                            onChange={(e) => setCreatePassword(e.target.value)}
+                            placeholder="Minimum 6 caractères"
+                            className="mt-1"
+                            autoComplete="new-password"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="create-confirm-password">Confirmer le mot de passe</Label>
+                          <Input
+                            id="create-confirm-password"
+                            type="password"
+                            value={createConfirmPassword}
+                            onChange={(e) => setCreateConfirmPassword(e.target.value)}
+                            className="mt-1"
+                            autoComplete="new-password"
+                          />
+                        </div>
+                        <Button type="submit" className="w-full">Créer l’utilisateur</Button>
+                      </form>
+
+                      <form onSubmit={handleChangePassword} className="space-y-4 rounded-xl border p-4">
+                        <div>
+                          <h3 className="font-semibold">Réinitialiser un mot de passe</h3>
+                          <p className="text-xs text-muted-foreground">
+                            Action réservée à l’administrateur.
+                          </p>
+                        </div>
+                        <div>
+                          <Label>Utilisateur</Label>
+                          <Select value={targetLogin} onValueChange={setTargetLogin}>
+                            <SelectTrigger className="mt-1">
+                              <SelectValue placeholder="Choisir un utilisateur" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {users.map((u) => (
+                                <SelectItem key={u.login} value={u.login}>
+                                  {u.login} ({u.role})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label htmlFor="new-password">Nouveau mot de passe</Label>
+                          <Input
+                            id="new-password"
+                            type="password"
+                            value={newPassword}
+                            onChange={(e) => setNewPassword(e.target.value)}
+                            placeholder="Minimum 6 caractères"
+                            className="mt-1"
+                            autoComplete="new-password"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="confirm-password">Confirmer le mot de passe</Label>
+                          <Input
+                            id="confirm-password"
+                            type="password"
+                            value={confirmPassword}
+                            onChange={(e) => setConfirmPassword(e.target.value)}
+                            className="mt-1"
+                            autoComplete="new-password"
+                          />
+                        </div>
+                        <Button type="submit" className="w-full">Enregistrer le mot de passe</Button>
+                      </form>
+                    </div>
                   </DialogContent>
                 </Dialog>
               </>
