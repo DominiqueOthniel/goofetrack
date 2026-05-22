@@ -21,6 +21,7 @@ import { exportToExcel, exportToPrintablePDF } from '@/lib/export-utils';
 import { EMOJI } from '@/lib/emoji-palette';
 import { frCollator, parseDateMs, stableSort } from '@/lib/list-sort';
 import { ListSortSelect } from '@/components/ListSortSelect';
+import { appendEntreeFromInvoicePayment } from '@/lib/caisse-local';
 
 const TRIP_STATUT_ORDER: Record<TripStatus, number> = {
   planifie: 0,
@@ -140,6 +141,7 @@ export default function Trips() {
     dateArrivee: '',
     recette: 0,
     prefinancement: 0,
+    paiementStatut: 'avancee' as 'solde' | 'avancee',
     client: '',
     marchandise: '',
     description: '',
@@ -222,6 +224,7 @@ export default function Trips() {
       dateArrivee: '',
       recette: 0,
       prefinancement: 0,
+      paiementStatut: 'avancee' as 'solde' | 'avancee',
       client: '',
       marchandise: '',
       description: '',
@@ -321,7 +324,40 @@ export default function Trips() {
             );
           }
         }
-        toast.success('Trajet ajouté avec succès');
+        if (formData.recette > 0) {
+          const isSolde = formData.paiementStatut === 'solde';
+          const numero = genInvoiceNum(invoices);
+          const createdInvoice = await createInvoice({
+            numero,
+            trajetId: createdTrip.id,
+            statut: isSolde ? 'payee' : 'en_attente',
+            montantHT: formData.recette,
+            tva: 0,
+            tps: 0,
+            montantTTC: formData.recette,
+            montantPaye: isSolde ? formData.recette : 0,
+            dateCreation: new Date().toISOString().split('T')[0],
+            datePaiement: isSolde ? formData.dateDepart : undefined,
+            modePaiement: isSolde ? 'Espèces' : undefined,
+            notes: isSolde
+              ? 'Trajet soldé dès la création.'
+              : 'Trajet avancé / à encaisser après création.',
+          });
+          if (isSolde) {
+            await appendEntreeFromInvoicePayment({
+              montant: formData.recette,
+              date: formData.dateDepart,
+              factureNumero: createdInvoice.numero,
+              factureId: createdInvoice.id,
+              modeLibelle: 'Espèces',
+            });
+          }
+        }
+        toast.success(
+          formData.paiementStatut === 'solde'
+            ? 'Trajet ajouté et soldé avec succès'
+            : 'Trajet ajouté avec facture en attente',
+        );
         setIsDialogOpen(false);
         resetForm();
       } catch (err) {
@@ -1221,6 +1257,28 @@ export default function Trips() {
                   placeholder="Détails supplémentaires"
                   rows={3}
                 />
+              </div>
+
+              <div>
+                <Label htmlFor="paiementStatutTrajet">Situation financière</Label>
+                <Select
+                  value={formData.paiementStatut}
+                  onValueChange={(value) => setFormData({
+                    ...formData,
+                    paiementStatut: value as 'solde' | 'avancee',
+                  })}
+                >
+                  <SelectTrigger id="paiementStatutTrajet">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="avancee">Avancé / à encaisser</SelectItem>
+                    <SelectItem value="solde">Soldé dès la création</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Soldé crée une facture payée et une entrée de caisse. Avancé crée une facture en attente.
+                </p>
               </div>
 
                 <Button type="submit" className="w-full" disabled={isSubmitting}>

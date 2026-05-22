@@ -956,7 +956,7 @@ export default function Invoices() {
         : null;
 
       const pdfContent = document.createElement('div');
-      pdfContent.className = 'invoice-print p-8 bg-white text-black';
+      pdfContent.className = 'invoice-print bg-white text-black';
       pdfContent.innerHTML = buildSingleInvoicePdfInnerHtml({
         invoice: selectedInvoice,
         dejaPaye,
@@ -978,16 +978,37 @@ export default function Invoices() {
             <head>
               <title>Facture ${selectedInvoice.numero}</title>
               <style>
+                @page {
+                  size: A4;
+                  margin: 7mm;
+                }
+                * {
+                  box-sizing: border-box;
+                  -webkit-print-color-adjust: exact;
+                  print-color-adjust: exact;
+                }
+                html {
+                  --invoice-zoom: 1;
+                  background: white;
+                }
                 body { 
                   font-family: Arial, sans-serif; 
-                  padding: 40px; 
+                  padding: 0; 
+                  margin: 0;
                   background: white;
                   color: black;
+                  font-size: 11px;
                 }
-                .invoice-print { max-width: 800px; margin: 0 auto; }
+                .invoice-print {
+                  max-width: 190mm;
+                  margin: 0 auto;
+                  zoom: var(--invoice-zoom);
+                }
                 table { width: 100%; border-collapse: collapse; }
-                th, td { padding: 12px; text-align: left; }
+                th, td { padding: 8px; text-align: left; vertical-align: top; }
                 th { background: #f3f4f6; font-weight: bold; }
+                p, h1, h2, h3 { page-break-after: avoid; }
+                table, tr, .border, .rounded-lg { page-break-inside: avoid; }
                 .border-t { border-top: 1px solid #e5e7eb; }
                 .border-t-2 { border-top: 2px solid #9ca3af; }
                 .border-b { border-bottom: 1px solid #e5e7eb; }
@@ -1007,6 +1028,7 @@ export default function Invoices() {
                 .font-semibold { font-weight: 600; }
                 .text-xs { font-size: 0.75rem; }
                 .text-sm { font-size: 0.875rem; }
+                .text-base { font-size: 1rem; }
                 .text-lg { font-size: 1.125rem; }
                 .text-2xl { font-size: 1.5rem; }
                 .text-3xl { font-size: 1.875rem; }
@@ -1014,6 +1036,7 @@ export default function Invoices() {
                 .grid { display: grid; }
                 .grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
                 .gap-6 { gap: 1.5rem; }
+                .gap-4 { gap: 1rem; }
                 .gap-8 { gap: 2rem; }
                 .flex { display: flex; }
                 .justify-between { justify-content: space-between; }
@@ -1027,15 +1050,24 @@ export default function Invoices() {
                 .mt-8 { margin-top: 2rem; }
                 .mt-12 { margin-top: 3rem; }
                 .p-3 { padding: 0.75rem; }
+                .p-2 { padding: 0.5rem; }
                 .p-8 { padding: 2rem; }
+                .pt-1 { padding-top: 0.25rem; }
+                .pt-2 { padding-top: 0.5rem; }
                 .pt-4 { padding-top: 1rem; }
                 .pt-8 { padding-top: 2rem; }
                 .pb-4 { padding-bottom: 1rem; }
+                .pb-3 { padding-bottom: 0.75rem; }
                 .pb-6 { padding-bottom: 1.5rem; }
                 .px-3 { padding-left: 0.75rem; padding-right: 0.75rem; }
                 .py-1 { padding-top: 0.25rem; padding-bottom: 0.25rem; }
                 .space-y-1 > * + * { margin-top: 0.25rem; }
+                .space-y-2 > * + * { margin-top: 0.5rem; }
                 .overflow-hidden { overflow: hidden; }
+                @media print {
+                  body { overflow: hidden; }
+                  .invoice-print { break-inside: avoid; }
+                }
               </style>
             </head>
             <body>
@@ -1047,6 +1079,13 @@ export default function Invoices() {
         
         // Attendre que le contenu soit chargé puis imprimer/télécharger
         setTimeout(() => {
+          const invoiceEl = printWindow.document.querySelector('.invoice-print') as HTMLElement | null;
+          if (invoiceEl) {
+            const printableHeightPx = 1040;
+            const height = invoiceEl.scrollHeight || printableHeightPx;
+            const scale = Math.min(1, Math.max(0.64, printableHeightPx / height));
+            printWindow.document.documentElement.style.setProperty('--invoice-zoom', String(scale));
+          }
           printWindow.print();
         }, 250);
       }
