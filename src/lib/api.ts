@@ -334,7 +334,6 @@ export const personnelApi = {
 
 // --- Admin ---
 export const adminApi = {
-  purge: () => request<{ message: string }>('/admin/purge', { method: 'DELETE' }),
   backup: () => fetch(`${API_URL}/admin/backup`),
   restore: (data: object) => request<{ message: string; counts: Record<string, number> }>('/admin/restore', {
     method: 'POST',

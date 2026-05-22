@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, Post, Res } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Post, Res } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { Response } from 'express';
@@ -22,26 +22,6 @@ export class AppController {
   @Get('health')
   health(): { status: string } {
     return { status: 'ok' };
-  }
-
-  @Delete('admin/purge')
-  async purge(): Promise<{ message: string }> {
-    await this.dataSource.query(`
-      TRUNCATE TABLE
-        invoices,
-        expenses,
-        trips,
-        parcel_expeditions,
-        driver_transactions,
-        bank_transactions,
-        bank_accounts,
-        trucks,
-        personnel,
-        drivers,
-        third_parties
-      RESTART IDENTITY CASCADE
-    `);
-    return { message: 'Base de données purgée avec succès' };
   }
 
   @Get('admin/backup')
