@@ -4,15 +4,15 @@
 # - l'API NestJS dans backend/ ;
 # - le frontend Vite en site statique.
 databases:
-  - name: truck-track-db
-    databaseName: truck_track
-    user: truck_track_user
+  - name: glaunet-db
+    databaseName: glaunet
+    user: glaunet_user
     region: frankfurt
     plan: free
 
 services:
   - type: web
-    name: truck-track-api
+    name: glaunet-api
     runtime: node
     region: frankfurt
     plan: free
@@ -26,7 +26,7 @@ services:
         value: 3000
       - key: DATABASE_URL
         fromDatabase:
-          name: truck-track-db
+          name: glaunet-db
           property: connectionString
       - key: DB_SYNCHRONIZE
         value: "true"
@@ -35,7 +35,7 @@ services:
     healthCheckPath: /api/health
 
   - type: web
-    name: truck-track-web
+    name: glaunet-web
     runtime: static
     region: frankfurt
     plan: free

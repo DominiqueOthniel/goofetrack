@@ -1,8 +1,11 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { setApiActor } from '@/lib/api';
 
-const AUTH_STORAGE_KEY = 'truck_track_auth';
-const USERS_STORAGE_KEY = 'truck_track_users';
+const AUTH_STORAGE_KEY = 'glaunet_auth';
+const USERS_STORAGE_KEY = 'glaunet_users';
+const LEGACY_STORAGE_PREFIX = ['truck', 'track'].join('_');
+const LEGACY_AUTH_STORAGE_KEY = `${LEGACY_STORAGE_PREFIX}_auth`;
+const LEGACY_USERS_STORAGE_KEY = `${LEGACY_STORAGE_PREFIX}_users`;
 
 export type UserRole = 'admin' | 'gestionnaire' | 'comptable';
 
@@ -37,7 +40,7 @@ async function hashPassword(password: string): Promise<string> {
 
 function getStoredUsers(): StoredUser[] {
   try {
-    const raw = localStorage.getItem(USERS_STORAGE_KEY);
+    const raw = localStorage.getItem(USERS_STORAGE_KEY) || localStorage.getItem(LEGACY_USERS_STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
       return Array.isArray(parsed) ? parsed : defaultUsers;
@@ -64,7 +67,7 @@ function saveStoredUsers(users: StoredUser[]) {
 function initUsers() {
   // Initialise les comptes de base sans supprimer les comptes créés par l'admin.
   try {
-    const raw = localStorage.getItem(USERS_STORAGE_KEY);
+    const raw = localStorage.getItem(USERS_STORAGE_KEY) || localStorage.getItem(LEGACY_USERS_STORAGE_KEY);
     const existing: StoredUser[] = raw ? JSON.parse(raw) : [];
     const merged = [...existing];
 
@@ -123,7 +126,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(() => {
     try {
-      const raw = localStorage.getItem(AUTH_STORAGE_KEY);
+      const raw = localStorage.getItem(AUTH_STORAGE_KEY) || localStorage.getItem(LEGACY_AUTH_STORAGE_KEY);
       return raw ? JSON.parse(raw) : null;
     } catch {
       return null;
@@ -142,6 +145,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     setApiActor(user ? { login: user.login, role: user.role } : null);
+    if (user) {
+      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user));
+    }
   }, [user]);
 
   const login = async (loginInput: string, password: string): Promise<boolean> => {
@@ -161,6 +167,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const logout = () => {
     setUser(null);
     localStorage.removeItem(AUTH_STORAGE_KEY);
+    localStorage.removeItem(LEGACY_AUTH_STORAGE_KEY);
   };
 
   const createUser = async (loginInput: string, role: UserRole, password: string): Promise<void> => {

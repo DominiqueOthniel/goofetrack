@@ -45,14 +45,14 @@ Les deux conviennent pour ce backend NestJS ; le choix dÃ©pend surtout du budg
 
 1. Sur Render : **New +** â†’ **Blueprint**.
 2. Connecte ton **repo GitHub** (autoriser Render si besoin).
-3. Render lit le `render.yaml` Ã  la racine du repo et crÃ©e le service **truck-track-api** avec `rootDir: backend`.
+3. Render lit le `render.yaml` Ã  la racine du repo et crÃ©e le service **glaunet-api** avec `rootDir: backend`.
 4. Clique sur **Apply**.
-5. Dans le **Dashboard** du service **truck-track-api** â†’ onglet **Environment** : ajoute (Add Environment Variable) :
+5. Dans le **Dashboard** du service **glaunet-api** â†’ onglet **Environment** : ajoute (Add Environment Variable) :
    - `DATABASE_URL` = ta chaÃ®ne PostgreSQL (ex. Supabase).
    - `FRONTEND_URL` = URL de ton front (ex. `https://ton-app.netlify.app`). Si pas encore de front en prod, mets `http://localhost:5173`.
    - `DB_SYNCHRONIZE` = `true` pour le **premier** dÃ©ploiement (crÃ©ation des tables). AprÃ¨s succÃ¨s, repasse Ã  `false`.
 6. Sauvegarde ; Render lance le build puis le deploy.
-7. Une fois terminÃ©, lâ€™API est Ã  lâ€™URL indiquÃ©e (ex. `https://truck-track-api.onrender.com`). VÃ©rifie : **GET** `https://ton-url.onrender.com/api/health` â†’ `{"status":"ok"}`.
+7. Une fois terminÃ©, lâ€™API est Ã  lâ€™URL indiquÃ©e (ex. `https://glaunet-api.onrender.com`). VÃ©rifie : **GET** `https://ton-url.onrender.com/api/health` â†’ `{"status":"ok"}`.
 
 ---
 
@@ -61,7 +61,7 @@ Les deux conviennent pour ce backend NestJS ; le choix dÃ©pend surtout du budg
 1. Sur Render : **New +** â†’ **Web Service**.
 2. Connecte ton **repo GitHub** et sÃ©lectionne le dÃ©pÃ´t.
 3. Configure :
-   - **Name** : `truck-track-api` (ou autre).
+   - **Name** : `glaunet-api` (ou autre).
    - **Region** : ex. Frankfurt.
    - **Root Directory** : `backend` (obligatoire).
    - **Runtime** : Node.
@@ -81,7 +81,7 @@ Les deux conviennent pour ce backend NestJS ; le choix dÃ©pend surtout du budg
 ### AprÃ¨s le premier dÃ©ploiement
 
 - Mets `DB_SYNCHRONIZE` Ã  `false` en **Environment** (Ã©viter que TypeORM modifie le schÃ©ma en prod).
-- Configure le front pour appeler lâ€™URL Render (ex. `VITE_API_URL=https://truck-track-api.onrender.com/api` si Vite).
+- Configure le front pour appeler lâ€™URL Render (ex. `VITE_API_URL=https://glaunet-api.onrender.com/api` si Vite).
 - Sur le free tier, le service peut sâ€™endormir aprÃ¨s ~15 min ; le premier appel peut prendre 30â€“60 s.
 
 ---

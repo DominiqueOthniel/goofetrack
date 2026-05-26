@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: truck-track-api
+    name: glaunet-api
     runtime: node
     region: frankfurt
     plan: free
@@ -17,5 +17,5 @@ services:
       - key: DB_SYNCHRONIZE
         value: "true"   # mettre "false" après le 1er déploiement
       - key: FRONTEND_URL
-        sync: false   # ex: https://truck-track.netlify.app
+        sync: false   # ex: https://glaunet.netlify.app
     healthCheckPath: /api/health

@@ -28,7 +28,7 @@ import { PersonnelModule } from './personnel/personnel.module';
       port: process.env.DATABASE_URL ? undefined : parseInt(process.env.DB_PORT || '5432', 10),
       username: process.env.DATABASE_URL ? undefined : (process.env.DB_USERNAME || 'postgres'),
       password: process.env.DATABASE_URL ? undefined : (process.env.DB_PASSWORD || 'postgres'),
-      database: process.env.DATABASE_URL ? undefined : (process.env.DB_DATABASE || 'truck_track'),
+      database: process.env.DATABASE_URL ? undefined : (process.env.DB_DATABASE || 'glaunet'),
       // SSL requis pour Supabase en production
       ssl: process.env.DATABASE_URL
         ? { rejectUnauthorized: false }

@@ -1,6 +1,6 @@
-# Truck Track – API NestJS
+# Glaunet – API NestJS
 
-Backend REST pour l’application Truck Track (gestion de flotte, trajets, chauffeurs, dépenses, factures, banque).
+Backend REST pour l’application Glaunet (gestion de flotte, trajets, chauffeurs, dépenses, factures, banque).
 
 ## Prérequis
 
@@ -26,7 +26,7 @@ cp .env.example .env
 2. Créer la base PostgreSQL :
 
 ```sql
-CREATE DATABASE truck_track;
+CREATE DATABASE glaunet;
 ```
 
 3. Ajuster les variables dans `.env` (connexion DB, port, CORS).

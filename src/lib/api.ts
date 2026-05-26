@@ -1,5 +1,5 @@
 /**
- * Client API pour Truck Track
+ * Client API pour Glaunet
  * Communique avec le backend NestJS (préfixe global `/api` sur le serveur).
  */
 

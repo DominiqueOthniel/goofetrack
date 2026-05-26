@@ -63,7 +63,7 @@ const variantConfig: Record<
 export function AppLogo({
   variant = 'sidebar',
   className,
-  alt = 'Truck Track — gestion de flotte',
+  alt = 'Glaunet — gestion de flotte',
 }: {
   variant?: AppLogoVariant;
   className?: string;
