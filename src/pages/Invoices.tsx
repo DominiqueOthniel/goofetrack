@@ -32,7 +32,12 @@ import {
   getBankAccounts,
   getBankTransactions,
 } from '@/lib/bank-local';
-import { appendEntreeFromInvoicePayment, isPaiementVersBanque } from '@/lib/caisse-local';
+import {
+  appendEntreeFromInvoicePayment,
+  appendSortieFromExpenseInvoicePayment,
+  isPaiementVersBanque,
+  upsertSortieFromExpense,
+} from '@/lib/caisse-local';
 import { COMPANY_NAME, COMPANY_TAGLINE } from '@/lib/invoice-branding';
 import { buildSingleInvoicePdfInnerHtml } from '@/lib/invoice-single-pdf-html';
 import { frCollator, parseDateMs, stableSort } from '@/lib/list-sort';
@@ -243,19 +248,27 @@ export default function Invoices() {
         await createInvoice({
           numero,
           expenseId: selectedExpenseId,
-          statut: 'en_attente',
+          statut: 'payee',
           montantHT: montantHTInitial,
           remise: expenseRemise > 0 ? expenseRemise : undefined,
           montantHTApresRemise: expenseRemise > 0 ? montantHTApresRemise : undefined,
           tva: expenseTva > 0 ? montantTVA : undefined,
           tps: expenseTps > 0 ? montantTPS : undefined,
           montantTTC,
-          montantPaye: 0,
+          montantPaye: montantTTC,
           dateCreation: new Date().toISOString().split('T')[0],
-          modePaiement: modePaiement || undefined,
-          notes: notes || undefined,
+          datePaiement: expense.date,
+          modePaiement: modePaiement || 'Espèces',
+          notes: notes || 'Dépense soldée automatiquement.',
         });
-        toast.success('Facture de dépense créée avec succès');
+        await upsertSortieFromExpense({
+          id: expense.id,
+          montant: montantTTC,
+          date: expense.date,
+          description: expense.description,
+          categorie: expense.categorie,
+        });
+        toast.success('Facture de dépense créée et soldée en caisse');
         setIsExpenseInvoiceDialogOpen(false);
         setSelectedExpenseId('');
         setModePaiement('');
@@ -374,18 +387,32 @@ export default function Invoices() {
           }
         } else if (paymentAmount > 0 && !isPaiementVersBanque(mode)) {
           try {
-            await appendEntreeFromInvoicePayment({
-              montant: paymentAmount,
-              date: datePaiementJour,
-              factureNumero: selectedInvoice.numero,
-              factureId: selectedInvoice.id,
-              modeLibelle: mode,
-            });
+            if (isExpenseInvoice) {
+              await appendSortieFromExpenseInvoicePayment({
+                montant: paymentAmount,
+                date: datePaiementJour,
+                factureNumero: selectedInvoice.numero,
+                factureId: selectedInvoice.id,
+                modeLibelle: mode,
+              });
+            } else {
+              await appendEntreeFromInvoicePayment({
+                montant: paymentAmount,
+                date: datePaiementJour,
+                factureNumero: selectedInvoice.numero,
+                factureId: selectedInvoice.id,
+                modeLibelle: mode,
+              });
+            }
             const factureSoldée = nouveauTotalPaye >= selectedInvoice.montantTTC;
             toast.success(
-              factureSoldée
-                ? `Facture soldée — ${paymentAmount.toLocaleString('fr-FR')} FCFA enregistrés en caisse`
-                : `Encaissement caisse ${paymentAmount.toLocaleString('fr-FR')} FCFA — reste ${(selectedInvoice.montantTTC - nouveauTotalPaye).toLocaleString('fr-FR')} FCFA sur la facture`,
+              isExpenseInvoice
+                ? factureSoldée
+                  ? `Facture fournisseur soldée — ${paymentAmount.toLocaleString('fr-FR')} FCFA sortis de caisse`
+                  : `Sortie caisse ${paymentAmount.toLocaleString('fr-FR')} FCFA — reste ${(selectedInvoice.montantTTC - nouveauTotalPaye).toLocaleString('fr-FR')} FCFA sur la facture fournisseur`
+                : factureSoldée
+                  ? `Facture soldée — ${paymentAmount.toLocaleString('fr-FR')} FCFA enregistrés en caisse`
+                  : `Encaissement caisse ${paymentAmount.toLocaleString('fr-FR')} FCFA — reste ${(selectedInvoice.montantTTC - nouveauTotalPaye).toLocaleString('fr-FR')} FCFA sur la facture`,
             );
           } catch {
             toast.error(

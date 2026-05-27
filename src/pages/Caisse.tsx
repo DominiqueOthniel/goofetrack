@@ -120,6 +120,50 @@ export default function Caisse() {
     if (isDialogOpen) refreshBankAccounts();
   }, [isDialogOpen]);
 
+  const expenseInvoiceRefs = useMemo(
+    () => new Set(invoices.filter((inv) => inv.expenseId).map((inv) => `facture:${inv.id}`)),
+    [invoices],
+  );
+
+  useEffect(() => {
+    if (expenseInvoiceRefs.size === 0 || transactions.length === 0) return;
+
+    const corrected = transactions.map((tx) => {
+      if (tx.type !== 'entree' || !tx.reference || !expenseInvoiceRefs.has(tx.reference)) {
+        return tx;
+      }
+
+      return {
+        ...tx,
+        type: 'sortie' as const,
+        categorie: tx.categorie === 'Encaissements clients' ? 'Factures fournisseurs' : tx.categorie || 'Factures fournisseurs',
+        description: tx.description.replace(/^Encaissement facture/, 'Paiement facture fournisseur'),
+        exclutRevenu: undefined,
+      };
+    });
+
+    if (corrected.every((tx, index) => tx === transactions[index])) return;
+
+    (async () => {
+      try {
+        if (isRemoteCaisse()) {
+          await Promise.all(
+            corrected
+              .filter((tx, index) => tx !== transactions[index])
+              .map((tx) => saveCaisseTransactionRemote(tx, false)),
+          );
+          setTransactions(getCaisseTransactions());
+          setSoldeInitial(getCaisseSoldeInitialSync());
+        } else {
+          saveTransactions(corrected);
+        }
+        toast.success('Mouvements de dépenses corrigés en sorties de caisse.');
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : 'Correction caisse impossible');
+      }
+    })();
+  }, [expenseInvoiceRefs, transactions]);
+
   /** Recharger les soldes banque depuis le localStorage quand la caisse change (ex. prélèvement lié). */
   useEffect(() => {
     refreshBankAccounts();

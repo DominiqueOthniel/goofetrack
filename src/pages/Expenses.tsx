@@ -187,18 +187,13 @@ export default function Expenses() {
       try {
         if (editingExpense) {
           const updated = await updateExpense(editingExpense.id, payload);
-          const isSolde = formData.paiementStatut === 'solde';
-          if (isSolde) {
-            await upsertSortieFromExpense({
-              id: updated.id,
-              montant: updated.montant,
-              date: updated.date,
-              description: updated.description,
-              categorie: updated.categorie,
-            });
-          } else {
-            await removeCaisseLienDepense(updated.id);
-          }
+          await upsertSortieFromExpense({
+            id: updated.id,
+            montant: updated.montant,
+            date: updated.date,
+            description: updated.description,
+            categorie: updated.categorie,
+          });
           const linkedInvoices = invoices.filter((inv) => inv.expenseId === updated.id);
           if (linkedInvoices.length > 0) {
             await Promise.all(
@@ -219,10 +214,10 @@ export default function Expenses() {
                   tva: montantTVA,
                   tps: montantTPS,
                   montantTTC,
-                  montantPaye: isSolde ? montantTTC : 0,
-                  statut: isSolde ? 'payee' : 'en_attente',
-                  datePaiement: isSolde ? updated.date : undefined,
-                  modePaiement: isSolde ? (inv.modePaiement || 'Espèces') : undefined,
+                  montantPaye: montantTTC,
+                  statut: 'payee',
+                  datePaiement: updated.date,
+                  modePaiement: inv.modePaiement || 'Espèces',
                 });
               }),
             );
@@ -230,36 +225,27 @@ export default function Expenses() {
           toast.success('Dépense modifiée');
         } else {
           const created = await createExpense(payload);
-          const isSolde = formData.paiementStatut === 'solde';
-          if (isSolde) {
-            await upsertSortieFromExpense({
-              id: created.id,
-              montant: created.montant,
-              date: created.date,
-              description: created.description,
-              categorie: created.categorie,
-            });
-          }
+          await upsertSortieFromExpense({
+            id: created.id,
+            montant: created.montant,
+            date: created.date,
+            description: created.description,
+            categorie: created.categorie,
+          });
           try {
             await createInvoice({
               numero: nextExpenseInvoiceNumero(invoices),
               expenseId: created.id,
-              statut: isSolde ? 'payee' : 'en_attente',
+              statut: 'payee',
               montantHT: created.montant,
               montantTTC: created.montant,
-              montantPaye: isSolde ? created.montant : 0,
+              montantPaye: created.montant,
               dateCreation: new Date().toISOString().split('T')[0],
-              datePaiement: isSolde ? created.date : undefined,
-              modePaiement: isSolde ? 'Espèces' : undefined,
-              notes: isSolde
-                ? 'Dépense soldée dès la création.'
-                : 'Dépense avancée / à régulariser après création.',
+              datePaiement: created.date,
+              modePaiement: 'Espèces',
+              notes: 'Dépense soldée dès la création.',
             });
-            toast.success(
-              isSolde
-                ? 'Dépense ajoutée, soldée et facture fournisseur créée'
-                : 'Dépense ajoutée avec facture fournisseur en attente',
-            );
+            toast.success('Dépense ajoutée, soldée et facture fournisseur créée');
           } catch (invErr) {
             console.error(invErr);
             toast.error(
@@ -323,15 +309,25 @@ export default function Expenses() {
         await createInvoice({
           numero,
           expenseId: selectedExpenseForInvoice.id,
-          statut: 'en_attente',
+          statut: 'payee',
           montantHT,
           tva: invoiceFormData.tva > 0 ? tva : undefined,
           tps: invoiceFormData.tps > 0 ? tps : undefined,
           montantTTC,
+          montantPaye: montantTTC,
           dateCreation: new Date().toISOString().split('T')[0],
-          notes: invoiceFormData.notes || undefined,
+          datePaiement: selectedExpenseForInvoice.date,
+          modePaiement: 'Espèces',
+          notes: invoiceFormData.notes || 'Dépense soldée dès la création de la facture.',
         });
-        toast.success('Facture créée avec succès');
+        await upsertSortieFromExpense({
+          id: selectedExpenseForInvoice.id,
+          montant: montantTTC,
+          date: selectedExpenseForInvoice.date,
+          description: selectedExpenseForInvoice.description,
+          categorie: selectedExpenseForInvoice.categorie,
+        });
+        toast.success('Facture créée et dépense soldée en caisse');
         setIsInvoiceDialogOpen(false);
         resetInvoiceForm();
       } catch (err) {
@@ -909,27 +905,12 @@ export default function Expenses() {
                   required
                 />
               </div>
-              <div>
-                <Label htmlFor="paiementStatutDepense">Situation financière</Label>
-                <Select
-                  value={formData.paiementStatut}
-                  onValueChange={(value) => setFormData({
-                    ...formData,
-                    paiementStatut: value as 'solde' | 'avancee',
-                  })}
-                >
-                  <SelectTrigger id="paiementStatutDepense">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="solde">Soldée dès la création</SelectItem>
-                    <SelectItem value="avancee">Avancée / à régulariser</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Soldée crée la sortie de caisse. Avancée crée seulement une facture fournisseur en attente.
-                </p>
-              </div>
+              <Alert>
+                <Info className="h-4 w-4" />
+                <AlertDescription>
+                  Toute dépense enregistrée est automatiquement soldée et ajoutée comme sortie de caisse.
+                </AlertDescription>
+              </Alert>
               <Button type="submit" className="w-full" disabled={isSubmitting}>
                 {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Enregistrement...</> : (editingExpense ? 'Modifier' : 'Ajouter')}
               </Button>

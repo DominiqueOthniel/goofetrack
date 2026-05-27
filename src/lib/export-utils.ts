@@ -1,4 +1,4 @@
-import * as XLSX from 'xlsx';
+import * as XLSX from 'xlsx-js-style';
 import { TRUCK_LOGO_SVG_MARK } from '@/lib/invoice-branding';
 
 interface ExportColumn<T> {
@@ -50,9 +50,151 @@ export function exportToExcel<T>(options: ExportOptions<T>) {
   });
 
   const worksheet = XLSX.utils.aoa_to_sheet(data);
+  styleExcelWorksheet(worksheet, {
+    columnCount: columns.length,
+    rowCount: data.length,
+    headerRowIndex: filtersDescription ? 3 : 2,
+    columns,
+    rows,
+  });
+
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
   XLSX.writeFile(workbook, fileName);
+}
+
+function styleExcelWorksheet<T>(
+  worksheet: XLSX.WorkSheet,
+  config: {
+    columnCount: number;
+    rowCount: number;
+    headerRowIndex: number;
+    columns: ExportColumn<T>[];
+    rows: T[];
+  },
+) {
+  const { columnCount, rowCount, headerRowIndex, columns, rows } = config;
+  if (columnCount === 0 || rowCount === 0) return;
+
+  const lastCol = columnCount - 1;
+  const titleRow = 0;
+  const filtersRow = headerRowIndex === 3 ? 1 : undefined;
+  const firstDataRow = headerRowIndex + 1;
+
+  worksheet['!merges'] = [
+    { s: { r: titleRow, c: 0 }, e: { r: titleRow, c: lastCol } },
+    ...(filtersRow !== undefined
+      ? [{ s: { r: filtersRow, c: 0 }, e: { r: filtersRow, c: lastCol } }]
+      : []),
+  ];
+
+  worksheet['!autofilter'] = {
+    ref: XLSX.utils.encode_range({
+      s: { r: headerRowIndex, c: 0 },
+      e: { r: Math.max(headerRowIndex, rowCount - 1), c: lastCol },
+    }),
+  };
+
+  worksheet['!cols'] = columns.map((column, index) => {
+    const values = rows.map((row, rowIndex) => String(column.value(row, rowIndex) ?? ''));
+    const maxLength = Math.max(column.header.length, ...values.map((value) => value.length));
+    return { wch: Math.min(Math.max(maxLength + 3, index === 0 ? 16 : 12), 42) };
+  });
+
+  const border = {
+    top: { style: 'thin', color: { rgb: 'CBD5E1' } },
+    right: { style: 'thin', color: { rgb: 'CBD5E1' } },
+    bottom: { style: 'thin', color: { rgb: 'CBD5E1' } },
+    left: { style: 'thin', color: { rgb: 'CBD5E1' } },
+  };
+
+  const titleStyle = {
+    font: { bold: true, sz: 16, color: { rgb: '1E3A8A' } },
+    fill: { patternType: 'solid', fgColor: { rgb: 'EFF6FF' } },
+    alignment: { horizontal: 'center', vertical: 'center' },
+    border,
+  };
+
+  const filtersStyle = {
+    font: { italic: true, color: { rgb: '92400E' } },
+    fill: { patternType: 'solid', fgColor: { rgb: 'FEF3C7' } },
+    alignment: { horizontal: 'left', vertical: 'center', wrapText: true },
+    border,
+  };
+
+  const headerStyle = {
+    font: { bold: true, color: { rgb: 'FFFFFF' } },
+    fill: { patternType: 'solid', fgColor: { rgb: '1D4ED8' } },
+    alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+    border,
+  };
+
+  const oddRowStyle = {
+    fill: { patternType: 'solid', fgColor: { rgb: 'FFFFFF' } },
+    alignment: { vertical: 'center', wrapText: true },
+    border,
+  };
+
+  const evenRowStyle = {
+    fill: { patternType: 'solid', fgColor: { rgb: 'F8FAFC' } },
+    alignment: { vertical: 'center', wrapText: true },
+    border,
+  };
+
+  worksheet['!rows'] = Array.from({ length: rowCount }, (_, index) => ({
+    hpt: index === titleRow ? 24 : index === headerRowIndex ? 22 : 18,
+  }));
+
+  for (let row = 0; row < rowCount; row += 1) {
+    for (let col = 0; col < columnCount; col += 1) {
+      const address = XLSX.utils.encode_cell({ r: row, c: col });
+      if (!worksheet[address]) {
+        worksheet[address] = { t: 's', v: '' };
+      }
+
+      if (row === titleRow) {
+        worksheet[address].s = titleStyle;
+      } else if (row === filtersRow) {
+        worksheet[address].s = filtersStyle;
+      } else if (row === headerRowIndex) {
+        worksheet[address].s = headerStyle;
+      } else if (row >= firstDataRow) {
+        const dataIndex = row - firstDataRow;
+        const cellStyle = columns[col].cellStyle?.(rows[dataIndex], dataIndex);
+        worksheet[address].s = {
+          ...(dataIndex % 2 === 0 ? evenRowStyle : oddRowStyle),
+          ...getExcelConditionalStyle(cellStyle),
+        };
+      } else {
+        worksheet[address].s = {
+          fill: { patternType: 'solid', fgColor: { rgb: 'FFFFFF' } },
+          border,
+        };
+      }
+    }
+  }
+}
+
+function getExcelConditionalStyle(style?: 'positive' | 'negative' | 'neutral') {
+  if (style === 'positive') {
+    return {
+      font: { bold: true, color: { rgb: '166534' } },
+      fill: { patternType: 'solid', fgColor: { rgb: 'DCFCE7' } },
+    };
+  }
+  if (style === 'negative') {
+    return {
+      font: { bold: true, color: { rgb: '991B1B' } },
+      fill: { patternType: 'solid', fgColor: { rgb: 'FEE2E2' } },
+    };
+  }
+  if (style === 'neutral') {
+    return {
+      font: { bold: true, color: { rgb: '374151' } },
+      fill: { patternType: 'solid', fgColor: { rgb: 'F3F4F6' } },
+    };
+  }
+  return {};
 }
 
 // Interface pour les totaux à afficher dans l'export
