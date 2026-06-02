@@ -13,7 +13,7 @@ export class AppController {
   @Get()
   getHello(): { name: string; version: string; api: string } {
     return {
-      name: 'Glaunet API',
+      name: 'GOOFE API',
       version: '1.0.0',
       api: '/api',
     };
@@ -70,7 +70,7 @@ export class AppController {
       },
     };
 
-    const filename = `glaunet-backup-${new Date().toISOString().split('T')[0]}.json`;
+    const filename = `goofe-backup-${new Date().toISOString().split('T')[0]}.json`;
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.send(JSON.stringify(backup, null, 2));

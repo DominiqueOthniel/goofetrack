@@ -1,4 +1,4 @@
-# Déployer le backend Glaunet sur Koyeb
+# Déployer le backend GOOFE sur Koyeb
 
 Koyeb propose un **free tier** avec 1 service web + 1 base de données. Ce guide décrit comment déployer l’API NestJS sur Koyeb à partir de GitHub.
 
@@ -8,7 +8,7 @@ Koyeb propose un **free tier** avec 1 service web + 1 base de données. Ce guide
 
 - Un compte [Koyeb](https://www.koyeb.com) (connexion GitHub recommandée).
 - Une base **PostgreSQL** : par exemple [Supabase](https://supabase.com) (gratuit). Récupère l’URL en mode **Transaction (pooler)** : bouton **Connect** → URI, port **6543**. Si le mot de passe contient `#`, remplace-le par `%23` dans l’URL.
-- Le dépôt GitHub du projet (ex. `DominiqueOthniel/glaunet`).
+- Le dépôt GitHub du projet (ex. `DominiqueOthniel/goofe`).
 
 ---
 
@@ -19,7 +19,7 @@ Koyeb propose un **free tier** avec 1 service web + 1 base de données. Ce guide
 1. Va sur [app.koyeb.com](https://app.koyeb.com).
 2. Clique sur **Create Web Service**.
 3. Choisis **GitHub** comme source et autorise Koyeb si besoin.
-4. Sélectionne le dépôt **glaunet** (ou colle l’URL du repo public).
+4. Sélectionne le dépôt **goofe** (ou colle l’URL du repo public).
 
 ### 2. Configurer le build (Builder buildpack)
 
@@ -42,7 +42,7 @@ Dans **Environment variables**, ajoute :
 |------------------|--------|--------|
 | `NODE_ENV`       | `production` | Non |
 | `DATABASE_URL`   | Ta chaîne PostgreSQL (Supabase, mode Transaction, port 6543). Mot de passe avec `#` → `%23`. | Oui (recommandé) |
-| `FRONTEND_URL`   | URL du front (ex. `https://glaunet.netlify.app`) | Non |
+| `FRONTEND_URL`   | URL du front (ex. `https://goofe.netlify.app`) | Non |
 | `DB_SYNCHRONIZE` | `true` au **premier** déploiement (création des tables), puis `false` | Non |
 
 **Port** : Koyeb injecte `PORT` automatiquement ; le backend utilise déjà `process.env.PORT || 3000`.
@@ -58,11 +58,11 @@ Cela permet à Koyeb de considérer le service comme healthy une fois l’API pr
 
 ### 5. Lancer le déploiement
 
-- Donne un **nom** à l’application et au service (ex. `glaunet-api`).
+- Donne un **nom** à l’application et au service (ex. `goofe-api`).
 - Clique sur **Deploy**. Koyeb clone le repo, build le dossier `backend`, puis lance `npm run start:prod`.
 
 Une fois le déploiement terminé, l’API est accessible à une URL du type :  
-`https://glaunet-api-xxx.koyeb.app`
+`https://goofe-api-xxx.koyeb.app`
 
 À vérifier :
 
@@ -85,8 +85,8 @@ C’est une **404** : l’URL répond, mais **ce déploiement** ne contient pas 
 Si tu préfères la ligne de commande (après [installation de la CLI](https://www.koyeb.com/docs/build-and-deploy/cli/installation)) :
 
 ```bash
-koyeb app init glaunet-api \
-  --git github.com/DominiqueOthniel/glaunet \
+koyeb app init goofe-api \
+  --git github.com/DominiqueOthniel/goofe \
   --git-branch main \
   --git-workdir backend \
   --git-buildpack-build-command "NPM_CONFIG_PRODUCTION=false npm install && npm run build" \

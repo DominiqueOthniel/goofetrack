@@ -1,7 +1,7 @@
 {
-  "name": "glaunet-api",
+  "name": "goofe-api",
   "version": "1.0.0",
-  "description": "API NestJS pour Glaunet",
+  "description": "API NestJS pour GOOFE",
   "scripts": {
     "build": "npx nest build",
     "start": "nest start",

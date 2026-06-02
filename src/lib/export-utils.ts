@@ -556,7 +556,7 @@ export function exportToPrintablePDF<T>(options: ExportOptions<T> | PDFExportOpt
         </div>
         ` : ''}
         <div class="footer">
-          Document généré automatiquement par Glaunet • ${currentDate}
+          Document généré automatiquement par GOOFE • ${currentDate}
         </div>
       </body>
     </html>

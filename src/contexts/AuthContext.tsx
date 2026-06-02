@@ -1,13 +1,16 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { setApiActor } from '@/lib/api';
 
-const AUTH_STORAGE_KEY = 'glaunet_auth';
-const USERS_STORAGE_KEY = 'glaunet_users';
+const AUTH_STORAGE_KEY = 'goofe_auth';
+const USERS_STORAGE_KEY = 'goofe_users';
+const GLAUNET_AUTH_STORAGE_KEY = 'glaunet_auth';
+const GLAUNET_USERS_STORAGE_KEY = 'glaunet_users';
 const LEGACY_STORAGE_PREFIX = ['truck', 'track'].join('_');
 const LEGACY_AUTH_STORAGE_KEY = `${LEGACY_STORAGE_PREFIX}_auth`;
 const LEGACY_USERS_STORAGE_KEY = `${LEGACY_STORAGE_PREFIX}_users`;
 
-export type UserRole = 'admin' | 'gestionnaire' | 'comptable';
+export type UserRole = 'admin' | 'pdg' | 'gestion_manager' | 'comptable';
+type StoredUserRole = UserRole | 'gestionnaire';
 
 export interface User {
   login: string;
@@ -22,13 +25,14 @@ export interface UserSummary {
 interface StoredUser {
   login: string;
   passwordHash: string;
-  role: UserRole;
+  role: StoredUserRole;
 }
 
 // Hash SHA-256 des mots de passe
 const GESTIONNAIRE_HASH = 'af960ccfc27d3ef7981c7fd8887ae7baa30f21aff0b9b15b6253e7b659545f87';
 const ADMIN_HASH = '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9';
 const COMPTABLE_HASH = '9c831eae072d3a93e92ba9d940aa186447bcef2eb777b570e267fe78a000bcb6';
+const PDG_HASH = '3c7c0c24b79903bae96dc85669cc58d82a0142ca87084ac0958652179de21ad3';
 
 async function hashPassword(password: string): Promise<string> {
   const encoder = new TextEncoder();
@@ -40,35 +44,68 @@ async function hashPassword(password: string): Promise<string> {
 
 function getStoredUsers(): StoredUser[] {
   try {
-    const raw = localStorage.getItem(USERS_STORAGE_KEY) || localStorage.getItem(LEGACY_USERS_STORAGE_KEY);
+    const raw =
+      localStorage.getItem(USERS_STORAGE_KEY) ||
+      localStorage.getItem(GLAUNET_USERS_STORAGE_KEY) ||
+      localStorage.getItem(LEGACY_USERS_STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : defaultUsers;
+      return Array.isArray(parsed) ? normalizeStoredUsers(parsed) : defaultUsers;
     }
   } catch {}
-  // Utilisateurs par défaut (admin: admin123, gestionnaire: gestion123, comptable: comptable123)
+  // Utilisateurs par défaut (admin: admin123, pdg: pdg123, gestionmanager: gestion123, comptable: comptable123)
   return defaultUsers;
 }
 
 const defaultUsers: StoredUser[] = [
   { login: 'admin', passwordHash: ADMIN_HASH, role: 'admin' as const },
-  { login: 'gestionnaire', passwordHash: GESTIONNAIRE_HASH, role: 'gestionnaire' as const },
+  { login: 'pdg', passwordHash: PDG_HASH, role: 'pdg' as const },
+  { login: 'gestionmanager', passwordHash: GESTIONNAIRE_HASH, role: 'gestion_manager' as const },
   { login: 'comptable', passwordHash: COMPTABLE_HASH, role: 'comptable' as const },
 ];
 
+function normalizeRole(role: StoredUserRole | string): UserRole {
+  if (role === 'gestionnaire') return 'gestion_manager';
+  if (role === 'admin' || role === 'pdg' || role === 'gestion_manager' || role === 'comptable') {
+    return role;
+  }
+  return 'comptable';
+}
+
+function normalizeStoredUser(user: StoredUser): StoredUser {
+  return {
+    ...user,
+    login: user.login === 'gestionnaire' ? 'gestionmanager' : user.login,
+    role: normalizeRole(user.role),
+  };
+}
+
+function normalizeStoredUsers(users: StoredUser[]): StoredUser[] {
+  const seen = new Set<string>();
+  return users.map(normalizeStoredUser).filter((user) => {
+    const key = user.login.toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 function listUserSummaries(users: StoredUser[]): UserSummary[] {
-  return users.map(({ login, role }) => ({ login, role }));
+  return users.map(({ login, role }) => ({ login, role: normalizeRole(role) }));
 }
 
 function saveStoredUsers(users: StoredUser[]) {
-  localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users));
+  localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(normalizeStoredUsers(users)));
 }
 
 function initUsers() {
   // Initialise les comptes de base sans supprimer les comptes créés par l'admin.
   try {
-    const raw = localStorage.getItem(USERS_STORAGE_KEY) || localStorage.getItem(LEGACY_USERS_STORAGE_KEY);
-    const existing: StoredUser[] = raw ? JSON.parse(raw) : [];
+    const raw =
+      localStorage.getItem(USERS_STORAGE_KEY) ||
+      localStorage.getItem(GLAUNET_USERS_STORAGE_KEY) ||
+      localStorage.getItem(LEGACY_USERS_STORAGE_KEY);
+    const existing: StoredUser[] = raw ? normalizeStoredUsers(JSON.parse(raw)) : [];
     const merged = [...existing];
 
     for (const def of defaultUsers) {
@@ -126,7 +163,10 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(() => {
     try {
-      const raw = localStorage.getItem(AUTH_STORAGE_KEY) || localStorage.getItem(LEGACY_AUTH_STORAGE_KEY);
+      const raw =
+        localStorage.getItem(AUTH_STORAGE_KEY) ||
+        localStorage.getItem(GLAUNET_AUTH_STORAGE_KEY) ||
+        localStorage.getItem(LEGACY_AUTH_STORAGE_KEY);
       return raw ? JSON.parse(raw) : null;
     } catch {
       return null;
@@ -158,7 +198,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const hash = await hashPassword(password);
     if (hash !== stored.passwordHash) return false;
 
-    const u: User = { login: stored.login, role: stored.role };
+    const u: User = { login: stored.login, role: normalizeRole(stored.role) };
     setUser(u);
     localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(u));
     return true;
@@ -167,6 +207,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const logout = () => {
     setUser(null);
     localStorage.removeItem(AUTH_STORAGE_KEY);
+    localStorage.removeItem(GLAUNET_AUTH_STORAGE_KEY);
     localStorage.removeItem(LEGACY_AUTH_STORAGE_KEY);
   };
 
@@ -227,10 +268,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const isAdmin = user?.role === 'admin';
-  const isGestionnaire = user?.role === 'gestionnaire';
+  const isGestionManager = user?.role === 'gestion_manager';
   const isComptable = user?.role === 'comptable';
 
-  const canManageFleet = !user || isAdmin || isGestionnaire;
+  const canManageFleet = !user || isAdmin || isGestionManager;
   const canManageAccounting = !user || isAdmin || isComptable;
   const canManageTreasury = !user || isAdmin || isComptable;
   const canManageCredits = !user || isAdmin || isComptable;
@@ -265,8 +306,14 @@ export const useAuth = () => {
 /** Liste des utilisateurs disponibles pour la sélection à la connexion */
 export const LOGIN_USER_OPTIONS = [
   {
-    login: 'gestionnaire',
-    label: 'Gestionnaire',
+    login: 'pdg',
+    label: 'PDG',
+    description:
+      'Lecture seule sur toute l’application : consultation complète sans création, modification ni suppression.',
+  },
+  {
+    login: 'gestion_manager',
+    label: 'Gestion manager',
     description:
       'Flotte : camions, trajets, expéditions, chauffeurs, personnel, tiers. Pas dépenses, facturation, comptes bancaires, caisse ni crédits.',
   },

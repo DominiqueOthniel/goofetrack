@@ -4,15 +4,15 @@
 # - l'API NestJS dans backend/ ;
 # - le frontend Vite en site statique.
 databases:
-  - name: glaunet-db
-    databaseName: glaunet
-    user: glaunet_user
+  - name: goofe-db
+    databaseName: goofe
+    user: goofe_user
     region: frankfurt
     plan: free
 
 services:
   - type: web
-    name: glaunet-api
+    name: goofe-api
     runtime: node
     region: frankfurt
     plan: free
@@ -26,7 +26,7 @@ services:
         value: 3000
       - key: DATABASE_URL
         fromDatabase:
-          name: glaunet-db
+          name: goofe-db
           property: connectionString
       - key: DB_SYNCHRONIZE
         value: "true"
@@ -35,7 +35,7 @@ services:
     healthCheckPath: /api/health
 
   - type: web
-    name: glaunet-web
+    name: goofe-web
     runtime: static
     region: frankfurt
     plan: free

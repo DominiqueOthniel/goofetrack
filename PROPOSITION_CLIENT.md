@@ -1,5 +1,5 @@
 # Proposition Commerciale - Sécurité des Données
-## Glaunet - Application de Gestion de Flotte
+## GOOFE - Application de Gestion de Flotte
 
 ---
 
@@ -206,7 +206,7 @@ R : Oui, l'application fonctionne entièrement hors ligne avec sauvegarde locale
 
 Pour toute question ou pour discuter de vos besoins spécifiques, n'hésitez pas à nous contacter.
 
-**Email** : support@glaunet.cm
+**Email** : support@goofe.cm
 **Téléphone** : +237 XXX XXX XXX
 
 ---

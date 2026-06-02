@@ -418,13 +418,15 @@ const initialSubCategories: Record<string, string[]> = {
   'Salaire': ['Salaire mensuel', 'Prime', 'Avance', 'Indemnité', 'Stage'],
   'Don': [],
 };
-const SUBCATEGORIES_STORAGE_KEY = 'glaunet_subcategories';
+const SUBCATEGORIES_STORAGE_KEY = 'goofe_subcategories';
+const GLAUNET_SUBCATEGORIES_STORAGE_KEY = 'glaunet_subcategories';
 const LEGACY_SUBCATEGORIES_STORAGE_KEY = `${['truck', 'track'].join('_')}_subcategories`;
 
 function getInitialSubCategories(): Record<string, string[]> {
   try {
     const raw =
       localStorage.getItem(SUBCATEGORIES_STORAGE_KEY) ||
+      localStorage.getItem(GLAUNET_SUBCATEGORIES_STORAGE_KEY) ||
       localStorage.getItem(LEGACY_SUBCATEGORIES_STORAGE_KEY);
     if (!raw) return initialSubCategories;
     const parsed = JSON.parse(raw) as Record<string, unknown>;

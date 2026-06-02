@@ -1,4 +1,4 @@
-# Proposition de Sécurité des Données - Glaunet
+# Proposition de Sécurité des Données - GOOFE
 
 ## 📋 Vue d'ensemble
 

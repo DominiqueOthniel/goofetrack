@@ -955,7 +955,7 @@ export default function Caisse() {
         </CardContent>
       </Card>
 
-      {/* Solde initial — trésorerie (gestionnaire / admin) */}
+      {/* Solde initial — trésorerie (comptable / admin) */}
       {canManageTreasury && (
         <div className="flex items-center gap-3 px-1">
           <span className="text-sm text-muted-foreground">Solde initial :</span>

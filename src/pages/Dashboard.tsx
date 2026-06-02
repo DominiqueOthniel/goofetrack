@@ -50,7 +50,7 @@ export default function Dashboard() {
       if (!response.ok) throw new Error('Erreur lors de la génération du backup');
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
-      const filename = `glaunet-backup-${new Date().toISOString().split('T')[0]}.json`;
+      const filename = `goofe-backup-${new Date().toISOString().split('T')[0]}.json`;
       const a = document.createElement('a');
       a.href = url;
       a.download = filename;
@@ -460,7 +460,7 @@ export default function Dashboard() {
                         <div>
                           <h3 className="font-semibold">Créer un utilisateur</h3>
                           <p className="text-xs text-muted-foreground">
-                            Exemples : comptable1, comptable2, gestionnaire2.
+                            Exemples : comptable1, comptable2, manager2, pdg2.
                           </p>
                         </div>
                         <div>
@@ -481,8 +481,9 @@ export default function Dashboard() {
                               <SelectValue placeholder="Choisir une catégorie" />
                             </SelectTrigger>
                             <SelectContent>
+                              <SelectItem value="pdg">PDG (lecture seule)</SelectItem>
                               <SelectItem value="admin">Administrateur</SelectItem>
-                              <SelectItem value="gestionnaire">Gestionnaire</SelectItem>
+                              <SelectItem value="gestion_manager">Gestion manager</SelectItem>
                               <SelectItem value="comptable">Comptable</SelectItem>
                             </SelectContent>
                           </Select>

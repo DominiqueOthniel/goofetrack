@@ -94,7 +94,7 @@ export default function AuditLogs() {
     } catch (e) {
       console.error(e);
       toast.error(
-        e instanceof Error ? e.message : 'Impossible de charger l’historique (droits admin requis).',
+        e instanceof Error ? e.message : 'Impossible de charger l’historique.',
       );
       setRows([]);
     } finally {
@@ -103,10 +103,10 @@ export default function AuditLogs() {
   }, [moduleFilter, actionFilter, actorLogin, from, to, limit, user]);
 
   useEffect(() => {
-    if (user?.role === 'admin') void load();
+    if (user?.role === 'admin' || user?.role === 'pdg') void load();
   }, [user?.role, load]);
 
-  if (!user || user.role !== 'admin') {
+  if (!user || (user.role !== 'admin' && user.role !== 'pdg')) {
     return <Navigate to="/" replace />;
   }
 

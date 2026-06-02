@@ -29,11 +29,15 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AppLogo } from '@/components/AppLogo';
 
-const SIDEBAR_HIDDEN_KEY = 'glaunet_sidebar_desktop_hidden';
+const SIDEBAR_HIDDEN_KEY = 'goofe_sidebar_desktop_hidden';
+const GLAUNET_SIDEBAR_HIDDEN_KEY = 'glaunet_sidebar_desktop_hidden';
 
 function readSidebarHidden(): boolean {
   try {
-    return localStorage.getItem(SIDEBAR_HIDDEN_KEY) === '1';
+    return (
+      localStorage.getItem(SIDEBAR_HIDDEN_KEY) === '1' ||
+      localStorage.getItem(GLAUNET_SIDEBAR_HIDDEN_KEY) === '1'
+    );
   } catch {
     return false;
   }
@@ -109,7 +113,7 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
   const navItems = useMemo(
     () =>
       navigation.filter(
-        (item) => !('adminOnly' in item && item.adminOnly) || user?.role === 'admin',
+        (item) => !('adminOnly' in item && item.adminOnly) || user?.role === 'admin' || user?.role === 'pdg',
       ),
     [user?.role],
   );
@@ -138,13 +142,15 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
 
   const currentPage = navItems.find(item => item.href === location.pathname)?.name || 'Dashboard';
 
-  const roleLabel = user?.role === 'gestionnaire' ? 'Gestionnaire'
-    : user?.role === 'comptable' ? 'Comptable'
-    : 'Administrateur';
+  const roleLabel = user?.role === 'pdg' ? 'PDG'
+    : user?.role === 'gestion_manager' ? 'Gestion manager'
+      : user?.role === 'comptable' ? 'Comptable'
+        : 'Administrateur';
 
-  const roleColor = user?.role === 'gestionnaire' ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20'
-    : user?.role === 'comptable' ? 'bg-blue-500/15 text-blue-400 border-blue-500/20'
-    : 'bg-violet-500/15 text-violet-400 border-violet-500/20';
+  const roleColor = user?.role === 'pdg' ? 'bg-amber-500/15 text-amber-400 border-amber-500/20'
+    : user?.role === 'gestion_manager' ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20'
+      : user?.role === 'comptable' ? 'bg-blue-500/15 text-blue-400 border-blue-500/20'
+        : 'bg-violet-500/15 text-violet-400 border-violet-500/20';
 
   return (
     <div className="min-h-screen bg-background relative">
@@ -305,7 +311,7 @@ function SidebarContent({
         <div className="flex items-center gap-2 min-w-0">
           <AppLogo variant="sidebar" />
           <div className="min-w-0">
-            <p className="font-bold text-sm text-sidebar-foreground leading-none truncate">Glaunet</p>
+            <p className="font-bold text-sm text-sidebar-foreground leading-none truncate">GOOFE</p>
             <p className="text-[10px] text-sidebar-foreground/40 leading-none mt-0.5">Cameroun</p>
           </div>
         </div>
@@ -372,7 +378,7 @@ function SidebarContent({
           Déconnexion
         </button>
         <p className="text-center text-[10px] text-sidebar-foreground/25 mt-3">
-          © {new Date().getFullYear()} Glaunet
+          © {new Date().getFullYear()} GOOFE
         </p>
       </div>
     </div>

@@ -1,5 +1,5 @@
 /**
- * Client API pour Glaunet
+ * Client API pour GOOFE
  * Communique avec le backend NestJS (préfixe global `/api` sur le serveur).
  */
 

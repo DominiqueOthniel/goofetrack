@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: glaunet-api
+    name: goofe-api
     runtime: node
     region: frankfurt
     plan: free
@@ -17,5 +17,5 @@ services:
       - key: DB_SYNCHRONIZE
         value: "true"   # mettre "false" après le 1er déploiement
       - key: FRONTEND_URL
-        sync: false   # ex: https://glaunet.netlify.app
+        sync: false   # ex: https://goofe.netlify.app
     healthCheckPath: /api/health

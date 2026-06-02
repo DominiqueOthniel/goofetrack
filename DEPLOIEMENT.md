@@ -1,4 +1,4 @@
-# Guide de Déploiement — Glaunet
+# Guide de Déploiement — GOOFE
 
 ## Stack de production
 - **Frontend** : Netlify (gratuit)
@@ -27,7 +27,7 @@
 ## Étape 2 — Render (Backend NestJS)
 
 1. Aller sur [render.com](https://render.com) → **New Web Service**
-2. Connecter ton repo GitHub : `DominiqueOthniel/glaunet`
+2. Connecter ton repo GitHub : `DominiqueOthniel/goofe`
 3. Configurer :
    - **Root Directory** : `backend`
    - **Region** : **Frankfurt (EU)**
@@ -43,7 +43,7 @@
    | `FRONTEND_URL` | *(l'URL Netlify — à remplir après l'étape 3)* |
    | `PORT` | `3000` |
 5. Cliquer **Deploy** → attendre ~3-5 minutes
-6. Copier l'URL du service : `https://glaunet-api.onrender.com`
+6. Copier l'URL du service : `https://goofe-api.onrender.com`
 
 > ⚠️ Après le premier déploiement réussi, repasser `DB_SYNCHRONIZE` à `false` dans les variables Render.
 
@@ -52,7 +52,7 @@
 ## Étape 3 — Netlify (Frontend React)
 
 1. Aller sur [netlify.com](https://netlify.com) → **Add new site → Import from Git**
-2. Connecter le repo GitHub : `DominiqueOthniel/glaunet`
+2. Connecter le repo GitHub : `DominiqueOthniel/goofe`
 3. Configurer :
    - **Base directory** : *(laisser vide — racine du repo)*
    - **Build command** : `npm run build`
@@ -60,9 +60,9 @@
 4. Ajouter la **variable d'environnement** :
    | Variable | Valeur |
    |---|---|
-   | `VITE_API_URL` | `https://glaunet-api.onrender.com/api` |
+   | `VITE_API_URL` | `https://goofe-api.onrender.com/api` |
 5. Cliquer **Deploy site**
-6. Copier l'URL Netlify : `https://glaunet-xxx.netlify.app`
+6. Copier l'URL Netlify : `https://goofe-xxx.netlify.app`
 
 ---
 
@@ -72,7 +72,7 @@
 2. Dans **Environment Variables**, mettre à jour :
    | Variable | Valeur |
    |---|---|
-   | `FRONTEND_URL` | `https://glaunet-xxx.netlify.app` |
+   | `FRONTEND_URL` | `https://goofe-xxx.netlify.app` |
 3. Render redéploie automatiquement
 
 ---
@@ -82,8 +82,8 @@
 1. Aller sur [uptimerobot.com](https://uptimerobot.com) → créer un compte gratuit
 2. **New Monitor** :
    - Type : **HTTP(s)**
-   - Name : `Glaunet API`
-   - URL : `https://glaunet-api.onrender.com/api/health`
+   - Name : `GOOFE API`
+   - URL : `https://goofe-api.onrender.com/api/health`
    - Interval : **5 minutes**
 3. Sauvegarder → ton backend ne dormira plus jamais ✅
 
@@ -92,9 +92,9 @@
 ## Récapitulatif des URLs finales
 
 ```
-Frontend  : https://glaunet-xxx.netlify.app
-Backend   : https://glaunet-api.onrender.com/api
-Health    : https://glaunet-api.onrender.com/api/health
+Frontend  : https://goofe-xxx.netlify.app
+Backend   : https://goofe-api.onrender.com/api
+Health    : https://goofe-api.onrender.com/api/health
 ```
 
 ---

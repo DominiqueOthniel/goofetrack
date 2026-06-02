@@ -4,16 +4,23 @@
 
 import { storeEncryptedData, getEncryptedData, hashPassword, verifyPassword } from './security';
 
-const STORAGE_KEY = 'glaunet_data';
-const PASSWORD_KEY = 'glaunet_password_hash';
-const LAST_BACKUP_KEY = 'glaunet_last_backup';
+const STORAGE_KEY = 'goofe_data';
+const PASSWORD_KEY = 'goofe_password_hash';
+const LAST_BACKUP_KEY = 'goofe_last_backup';
+const GLAUNET_STORAGE_KEY = 'glaunet_data';
+const GLAUNET_PASSWORD_KEY = 'glaunet_password_hash';
+const GLAUNET_LAST_BACKUP_KEY = 'glaunet_last_backup';
 const LEGACY_STORAGE_PREFIX = ['truck', 'track'].join('_');
 const LEGACY_STORAGE_KEY = `${LEGACY_STORAGE_PREFIX}_data`;
 const LEGACY_PASSWORD_KEY = `${LEGACY_STORAGE_PREFIX}_password_hash`;
 const LEGACY_LAST_BACKUP_KEY = `${LEGACY_STORAGE_PREFIX}_last_backup`;
 
-function getStoredValue(key: string, legacyKey: string): string | null {
-  return localStorage.getItem(key) || localStorage.getItem(legacyKey);
+function getStoredValue(...keys: string[]): string | null {
+  for (const key of keys) {
+    const value = localStorage.getItem(key);
+    if (value != null) return value;
+  }
+  return null;
 }
 
 export interface AppData {
@@ -47,14 +54,14 @@ export async function initializeStorage(password: string): Promise<boolean> {
  * Vérifie si un mot de passe est configuré
  */
 export function hasPassword(): boolean {
-  return getStoredValue(PASSWORD_KEY, LEGACY_PASSWORD_KEY) !== null;
+  return getStoredValue(PASSWORD_KEY, GLAUNET_PASSWORD_KEY, LEGACY_PASSWORD_KEY) !== null;
 }
 
 /**
  * Vérifie le mot de passe
  */
 export async function checkPassword(password: string): Promise<boolean> {
-  const storedHash = getStoredValue(PASSWORD_KEY, LEGACY_PASSWORD_KEY);
+  const storedHash = getStoredValue(PASSWORD_KEY, GLAUNET_PASSWORD_KEY, LEGACY_PASSWORD_KEY);
   if (!storedHash) return false;
   return verifyPassword(password, storedHash);
 }
@@ -81,6 +88,7 @@ export async function loadData(password: string): Promise<AppData | null> {
   try {
     const dataString =
       (await getEncryptedData(STORAGE_KEY, password)) ||
+      (await getEncryptedData(GLAUNET_STORAGE_KEY, password)) ||
       (await getEncryptedData(LEGACY_STORAGE_KEY, password));
     if (!dataString) return null;
     return JSON.parse(dataString);
@@ -116,7 +124,7 @@ export async function importData(jsonData: string, password: string): Promise<bo
  * Obtient la date de la dernière sauvegarde
  */
 export function getLastBackupDate(): Date | null {
-  const dateString = getStoredValue(LAST_BACKUP_KEY, LEGACY_LAST_BACKUP_KEY);
+  const dateString = getStoredValue(LAST_BACKUP_KEY, GLAUNET_LAST_BACKUP_KEY, LEGACY_LAST_BACKUP_KEY);
   return dateString ? new Date(dateString) : null;
 }
 
