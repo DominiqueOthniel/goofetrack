@@ -2,7 +2,7 @@
  * Identité visuelle commune aux PDF factures (liste + facture unitaire).
  */
 
-export const COMPANY_NAME = 'GOOFE';
+export const COMPANY_NAME = 'SIA-GOOFE';
 
 export const COMPANY_TAGLINE = 'Transport de marchandises · Douala, Cameroun';
 

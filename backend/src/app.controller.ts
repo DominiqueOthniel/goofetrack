@@ -13,7 +13,7 @@ export class AppController {
   @Get()
   getHello(): { name: string; version: string; api: string } {
     return {
-      name: 'GOOFE API',
+      name: 'SIA-GOOFE API',
       version: '1.0.0',
       api: '/api',
     };

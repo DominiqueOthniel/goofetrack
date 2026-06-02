@@ -63,7 +63,7 @@ const variantConfig: Record<
 export function AppLogo({
   variant = 'sidebar',
   className,
-  alt = 'GOOFE — gestion de flotte',
+  alt = 'SIA-GOOFE — gestion de flotte',
 }: {
   variant?: AppLogoVariant;
   className?: string;

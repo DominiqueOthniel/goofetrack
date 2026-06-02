@@ -684,7 +684,7 @@ export default function Drivers() {
           ${driversContent}
           
           <div class="footer">
-            Document généré automatiquement par GOOFE • ${currentDate}
+            Document généré automatiquement par SIA-GOOFE • ${currentDate}
           </div>
         </body>
       </html>

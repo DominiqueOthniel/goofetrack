@@ -1,7 +1,7 @@
 {
   "name": "goofe-api",
   "version": "1.0.0",
-  "description": "API NestJS pour GOOFE",
+  "description": "API NestJS pour SIA-GOOFE",
   "scripts": {
     "build": "npx nest build",
     "start": "nest start",

@@ -1,6 +1,6 @@
-# GOOFE – API NestJS
+# SIA-GOOFE – API NestJS
 
-Backend REST pour l’application GOOFE (gestion de flotte, trajets, chauffeurs, dépenses, factures, banque).
+Backend REST pour l’application SIA-GOOFE (gestion de flotte, trajets, chauffeurs, dépenses, factures, banque).
 
 ## Prérequis
 

@@ -87,7 +87,7 @@ export default function Login() {
             </div>
 
             <h1 className="text-3xl font-bold text-white mb-1">
-              <span className="bg-gradient-to-r from-violet-400 to-indigo-400 bg-clip-text text-transparent">GOOFE</span>
+              <span className="bg-gradient-to-r from-violet-400 to-indigo-400 bg-clip-text text-transparent">SIA-GOOFE</span>
             </h1>
             <p className="text-white/50 text-sm">Gestion de flotte · Cameroun</p>
           </div>
@@ -174,7 +174,7 @@ export default function Login() {
 
           {/* Footer */}
           <p className="text-center text-white/25 text-xs mt-6">
-            GOOFE © {new Date().getFullYear()}
+            SIA-GOOFE © {new Date().getFullYear()}
           </p>
         </div>
       </div>

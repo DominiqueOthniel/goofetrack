@@ -1,4 +1,4 @@
-# Proposition de Sécurité des Données - GOOFE
+# Proposition de Sécurité des Données - SIA-GOOFE
 
 ## 📋 Vue d'ensemble
 

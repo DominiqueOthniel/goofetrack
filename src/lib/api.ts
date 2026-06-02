@@ -1,5 +1,5 @@
 /**
- * Client API pour GOOFE
+ * Client API pour SIA-GOOFE
  * Communique avec le backend NestJS (préfixe global `/api` sur le serveur).
  */
 
