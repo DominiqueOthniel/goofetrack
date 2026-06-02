@@ -35,8 +35,11 @@ import {
 import {
   appendEntreeFromInvoicePayment,
   appendSortieFromExpenseInvoicePayment,
+  isRemoteCaisse,
   isPaiementVersBanque,
+  refreshCaisseFromApi,
   upsertSortieFromExpense,
+  validateCaisseTransaction,
 } from '@/lib/caisse-local';
 import { COMPANY_NAME, COMPANY_TAGLINE } from '@/lib/invoice-branding';
 import { buildSingleInvoicePdfInnerHtml } from '@/lib/invoice-single-pdf-html';
@@ -243,6 +246,21 @@ export default function Invoices() {
     const invoiceCount = invoices.filter(inv => inv.numero.startsWith(`FAC-EXP-${year}`)).length + 1;
     const numero = `FAC-EXP-${year}-${String(invoiceCount).padStart(3, '0')}`;
 
+    if (isRemoteCaisse()) await refreshCaisseFromApi();
+    const caisseCheck = validateCaisseTransaction(
+      {
+        id: `caisse-dep-${expense.id}`,
+        type: 'sortie',
+        montant: montantTTC,
+        reference: `depense:${expense.id}`,
+      },
+      { existingReference: `depense:${expense.id}` },
+    );
+    if (caisseCheck.ok === false) {
+      toast.error(caisseCheck.message);
+      return;
+    }
+
     await withExpenseInvoiceGuard(async () => {
       try {
         await createInvoice({
@@ -325,6 +343,20 @@ export default function Invoices() {
     const nouveauTotalPaye = dejaPaye + paymentAmount;
     const datePaiementJour = new Date().toISOString().split('T')[0];
     const isExpenseInvoice = Boolean(selectedInvoice.expenseId);
+
+    if (paymentAmount > 0 && isExpenseInvoice && !isPaiementVersBanque(mode)) {
+      if (isRemoteCaisse()) await refreshCaisseFromApi();
+      const caisseCheck = validateCaisseTransaction({
+        id: `caisse-facture-${selectedInvoice.id}-${Date.now()}`,
+        type: 'sortie',
+        montant: paymentAmount,
+        reference: `facture:${selectedInvoice.id}`,
+      });
+      if (caisseCheck.ok === false) {
+        toast.error(caisseCheck.message);
+        return;
+      }
+    }
 
     await withPaymentGuard(async () => {
       try {

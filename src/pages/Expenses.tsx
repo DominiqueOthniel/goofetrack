@@ -17,7 +17,13 @@ import PageHeader from '@/components/PageHeader';
 import { useAuth } from '@/contexts/AuthContext';
 import { exportToExcel, exportToPrintablePDF } from '@/lib/export-utils';
 import { EMOJI } from '@/lib/emoji-palette';
-import { removeCaisseLienDepense, upsertSortieFromExpense } from '@/lib/caisse-local';
+import {
+  isRemoteCaisse,
+  refreshCaisseFromApi,
+  removeCaisseLienDepense,
+  upsertSortieFromExpense,
+  validateCaisseTransaction,
+} from '@/lib/caisse-local';
 import { frCollator, parseDateMs, stableSort } from '@/lib/list-sort';
 import { ListSortSelect } from '@/components/ListSortSelect';
 
@@ -183,6 +189,22 @@ export default function Expenses() {
       date: formData.date,
       description: formData.description,
     };
+
+    if (isRemoteCaisse()) await refreshCaisseFromApi();
+    const caisseCheck = validateCaisseTransaction(
+      {
+        id: editingExpense ? `caisse-dep-${editingExpense.id}` : `caisse-dep-preview-${Date.now()}`,
+        type: 'sortie',
+        montant: finalMontant,
+        reference: editingExpense ? `depense:${editingExpense.id}` : undefined,
+      },
+      editingExpense ? { existingReference: `depense:${editingExpense.id}` } : undefined,
+    );
+    if (caisseCheck.ok === false) {
+      toast.error(caisseCheck.message);
+      return;
+    }
+
     await withGuard(async () => {
       try {
         if (editingExpense) {
@@ -303,6 +325,20 @@ export default function Expenses() {
     const montantTTC = montantHT + tva + tps;
 
     const numero = nextExpenseInvoiceNumero(invoices);
+    if (isRemoteCaisse()) await refreshCaisseFromApi();
+    const caisseCheck = validateCaisseTransaction(
+      {
+        id: `caisse-dep-${selectedExpenseForInvoice.id}`,
+        type: 'sortie',
+        montant: montantTTC,
+        reference: `depense:${selectedExpenseForInvoice.id}`,
+      },
+      { existingReference: `depense:${selectedExpenseForInvoice.id}` },
+    );
+    if (caisseCheck.ok === false) {
+      toast.error(caisseCheck.message);
+      return;
+    }
 
     await withInvoiceGuard(async () => {
       try {

@@ -20,6 +20,13 @@ export interface CaisseTransaction {
   exclutRevenu?: boolean;
 }
 
+export const CAISSE_SOLDE_INSUFFISANT_MESSAGE =
+  'Solde caisse insuffisant : opération annulée pour éviter un solde négatif.';
+
+export type CaisseValidationResult =
+  | { ok: true; soldeProjeté: number }
+  | { ok: false; message: string; soldeDisponible: number; soldeProjeté: number };
+
 function parseNum(val: unknown): number {
   if (typeof val === 'number' && !Number.isNaN(val)) return val;
   if (typeof val === 'string') return parseFloat(val) || 0;
@@ -87,7 +94,79 @@ export function getCaisseSoldeInitialSync(): number {
   return parseFloat(localStorage.getItem('caisse_solde_initial') || '0') || 0;
 }
 
+export function calculateCaisseSolde(
+  transactions: CaisseTransaction[] = getCaisseTransactions(),
+  soldeInitial = getCaisseSoldeInitialSync(),
+): number {
+  return transactions.reduce(
+    (sum, t) => sum + (t.type === 'entree' ? t.montant : -t.montant),
+    soldeInitial,
+  );
+}
+
+function caisseTxEffect(tx: Pick<CaisseTransaction, 'type' | 'montant'>): number {
+  return tx.type === 'entree' ? tx.montant : -tx.montant;
+}
+
+export function validateCaisseTransaction(
+  tx: Pick<CaisseTransaction, 'id' | 'type' | 'montant' | 'reference'>,
+  options: {
+    existingId?: string;
+    existingReference?: string;
+    transactions?: CaisseTransaction[];
+    soldeInitial?: number;
+  } = {},
+): CaisseValidationResult {
+  const transactions = options.transactions ?? getCaisseTransactions();
+  const soldeInitial = options.soldeInitial ?? getCaisseSoldeInitialSync();
+  if (!Number.isFinite(tx.montant) || tx.montant <= 0) {
+    return {
+      ok: false,
+      message: 'Le montant doit être un nombre positif.',
+      soldeDisponible: calculateCaisseSolde(transactions, soldeInitial),
+      soldeProjeté: calculateCaisseSolde(transactions, soldeInitial),
+    };
+  }
+  const remaining = transactions.filter((current) => {
+    if (options.existingId && current.id === options.existingId) return false;
+    if (options.existingReference && current.reference === options.existingReference) return false;
+    return true;
+  });
+  const soldeDisponible = calculateCaisseSolde(remaining, soldeInitial);
+  const soldeProjeté = soldeDisponible + caisseTxEffect(tx);
+
+  if (soldeProjeté < 0) {
+    return {
+      ok: false,
+      message: `${CAISSE_SOLDE_INSUFFISANT_MESSAGE} Disponible : ${soldeDisponible.toLocaleString('fr-FR')} FCFA.`,
+      soldeDisponible,
+      soldeProjeté,
+    };
+  }
+
+  return { ok: true, soldeProjeté };
+}
+
+export function validateCaisseSoldeInitial(
+  nextSoldeInitial: number,
+  transactions: CaisseTransaction[] = getCaisseTransactions(),
+): CaisseValidationResult {
+  const soldeProjeté = calculateCaisseSolde(transactions, nextSoldeInitial);
+  if (soldeProjeté < 0) {
+    return {
+      ok: false,
+      message: `${CAISSE_SOLDE_INSUFFISANT_MESSAGE} Le solde initial est trop bas pour les sorties déjà enregistrées.`,
+      soldeDisponible: calculateCaisseSolde(transactions, getCaisseSoldeInitialSync()),
+      soldeProjeté,
+    };
+  }
+  return { ok: true, soldeProjeté };
+}
+
 export async function persistCaisseSoldeInitial(value: number): Promise<void> {
+  if (isRemoteCaisse()) await refreshCaisseFromApi();
+  const check = validateCaisseSoldeInitial(value);
+  if (check.ok === false) throw new Error(check.message);
   if (isRemoteCaisse()) {
     await caisseApi.updateConfig({ soldeInitial: value });
     await refreshCaisseFromApi();
@@ -172,6 +251,9 @@ export async function appendSortieFromExpenseInvoicePayment(params: {
     reference: `facture:${params.factureId}`,
     categorie: 'Factures fournisseurs',
   };
+  if (isRemoteCaisse()) await refreshCaisseFromApi();
+  const check = validateCaisseTransaction(tx);
+  if (check.ok === false) throw new Error(check.message);
   if (isRemoteCaisse()) {
     await caisseApi.createTransaction(payloadFromTx(tx));
     await refreshCaisseFromApi();
@@ -212,6 +294,9 @@ export async function upsertSortieFromExpense(expense: {
     reference: ref,
     categorie: expense.categorie || 'Dépenses',
   };
+  if (isRemoteCaisse()) await refreshCaisseFromApi();
+  const check = validateCaisseTransaction(tx, { existingReference: ref });
+  if (check.ok === false) throw new Error(check.message);
   if (isRemoteCaisse()) {
     await caisseApi.upsertByReference(ref, payloadFromTx(tx));
     await refreshCaisseFromApi();
@@ -234,6 +319,9 @@ export async function removeCaisseLienDepense(expenseId: string): Promise<void> 
 /** Création / mise à jour d’une ligne (mode API). */
 export async function saveCaisseTransactionRemote(tx: CaisseTransaction, isNew: boolean): Promise<void> {
   if (!isRemoteCaisse()) return;
+  await refreshCaisseFromApi();
+  const check = validateCaisseTransaction(tx, isNew ? undefined : { existingId: tx.id });
+  if (check.ok === false) throw new Error(check.message);
   if (isNew) {
     await caisseApi.createTransaction(payloadFromTx(tx));
   } else {

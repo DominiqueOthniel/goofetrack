@@ -39,6 +39,8 @@ import {
   getCaisseSoldeInitialSync,
   saveCaisseTransactionRemote,
   deleteCaisseTransactionRemote,
+  validateCaisseSoldeInitial,
+  validateCaisseTransaction,
 } from '@/lib/caisse-local';
 import { frCollator, parseDateMs, stableSort } from '@/lib/list-sort';
 import { ListSortSelect } from '@/components/ListSortSelect';
@@ -155,7 +157,7 @@ export default function Caisse() {
           setTransactions(getCaisseTransactions());
           setSoldeInitial(getCaisseSoldeInitialSync());
         } else {
-          saveTransactions(corrected);
+          if (!saveTransactions(corrected)) return;
         }
         toast.success('Mouvements de dépenses corrigés en sorties de caisse.');
       } catch (e) {
@@ -190,14 +192,29 @@ export default function Caisse() {
     return calculateAccountBalance(compteBanqueId, bankAccounts, getBankTransactions());
   }, [compteBanqueId, deduireSurBanque, formData.type, bankAccounts]);
 
-  const saveTransactions = (newTransactions: CaisseTransaction[]) => {
+  const saveTransactions = (
+    newTransactions: CaisseTransaction[],
+    validationSoldeInitial = soldeInitial,
+  ): boolean => {
+    const check = validateCaisseSoldeInitial(validationSoldeInitial, newTransactions);
+    if (check.ok === false) {
+      toast.error(check.message);
+      return false;
+    }
     setTransactions(newTransactions);
     if (!isRemoteCaisse()) {
       setCaisseTransactions(newTransactions);
     }
+    return true;
   };
 
   const saveSoldeInitial = async (value: number) => {
+    const check = validateCaisseSoldeInitial(value, transactions);
+    if (check.ok === false) {
+      setSoldeInitial(getCaisseSoldeInitialSync());
+      toast.error(check.message);
+      return;
+    }
     setSoldeInitial(value);
     try {
       if (isRemoteCaisse()) {
@@ -277,6 +294,16 @@ export default function Caisse() {
         exclutRevenu: formData.type === 'entree' && formData.exclutRevenu ? true : undefined,
       };
 
+      const caisseCheck = validateCaisseTransaction(base, {
+        existingId: editingTransaction.id,
+        transactions,
+        soldeInitial,
+      });
+      if (caisseCheck.ok === false) {
+        toast.error(caisseCheck.message);
+        return;
+      }
+
       if (formData.type === 'entree' && shouldDeduireBanque) {
         const oldBankTx: BankTransaction | undefined = prevLinked
           ? getBankTransactions().find((x) => x.id === prevLinked)
@@ -328,6 +355,12 @@ export default function Caisse() {
       exclutRevenu: formData.type === 'entree' && formData.exclutRevenu ? true : undefined,
     };
 
+    const caisseCheck = validateCaisseTransaction(newTransaction, { transactions, soldeInitial });
+    if (caisseCheck.ok === false) {
+      toast.error(caisseCheck.message);
+      return;
+    }
+
     if (shouldDeduireBanque) {
       const result = await addRetraitPourCaisse({
         compteId: compteBanqueId,
@@ -365,6 +398,14 @@ export default function Caisse() {
   const handleDelete = async (id: string) => {
     if (!confirm('Êtes-vous sûr de vouloir supprimer cette transaction ?')) return;
     const t = transactions.find((x) => x.id === id);
+    const caisseCheck = validateCaisseSoldeInitial(
+      soldeInitial,
+      transactions.filter((x) => x.id !== id),
+    );
+    if (caisseCheck.ok === false) {
+      toast.error(caisseCheck.message);
+      return;
+    }
     if (t?.bankTransactionId) {
       await removeBankTransactionAsync(t.bankTransactionId);
     }
@@ -454,8 +495,14 @@ export default function Caisse() {
       }
 
       const { soldeInitial: savedSolde, transactions: savedTx } = parsed.caisse;
-      saveTransactions(savedTx ?? []);
-      void saveSoldeInitial(savedSolde ?? 0);
+      const restoredTransactions = savedTx ?? [];
+      const restoredSolde = savedSolde ?? 0;
+      const check = validateCaisseSoldeInitial(restoredSolde, restoredTransactions);
+      if (check.ok === false) {
+        throw new Error(`${check.message} Restauration annulée.`);
+      }
+      if (!saveTransactions(restoredTransactions, restoredSolde)) return;
+      void saveSoldeInitial(restoredSolde);
       toast.success(`Caisse restaurée : ${savedTx?.length ?? 0} transaction(s) importée(s)`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Erreur lors de la restauration');

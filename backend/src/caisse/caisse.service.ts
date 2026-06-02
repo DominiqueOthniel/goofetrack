@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
@@ -28,6 +28,46 @@ export class CaisseService {
     return row;
   }
 
+  private txDelta(tx: Pick<CaisseTransactionEntity, 'type' | 'montant'>): number {
+    const montant = Number(tx.montant);
+    return tx.type === 'entree' ? montant : -montant;
+  }
+
+  private async computeProjectedBalance(options: {
+    soldeInitial?: number;
+    excludeIds?: string[];
+    excludeReference?: string;
+    next?: Pick<CaisseTransactionEntity, 'type' | 'montant'>;
+  } = {}): Promise<number> {
+    const config = await this.getOrCreateConfig();
+    const txs = await this.txRepo.find();
+    const excludedIds = new Set(options.excludeIds ?? []);
+    let solde = options.soldeInitial ?? Number(config.soldeInitial);
+
+    for (const t of txs) {
+      if (excludedIds.has(t.id)) continue;
+      if (options.excludeReference && t.reference === options.excludeReference) continue;
+      solde += this.txDelta(t);
+    }
+
+    if (options.next) solde += this.txDelta(options.next);
+    return solde;
+  }
+
+  private assertPositiveAmount(montant: number): void {
+    if (!Number.isFinite(montant) || montant <= 0) {
+      throw new BadRequestException('Le montant doit être un nombre positif.');
+    }
+  }
+
+  private assertCaisseBalance(soldeProjeté: number): void {
+    if (soldeProjeté < 0) {
+      throw new BadRequestException(
+        'Solde caisse insuffisant : opération annulée pour éviter un solde négatif.',
+      );
+    }
+  }
+
   async getConfig(): Promise<{ id: number; soldeInitial: number }> {
     const c = await this.getOrCreateConfig();
     return { id: c.id, soldeInitial: Number(c.soldeInitial) };
@@ -35,6 +75,8 @@ export class CaisseService {
 
   async updateConfig(dto: UpdateCaisseConfigDto): Promise<{ id: number; soldeInitial: number }> {
     await this.getOrCreateConfig();
+    const soldeProjeté = await this.computeProjectedBalance({ soldeInitial: dto.soldeInitial });
+    this.assertCaisseBalance(soldeProjeté);
     await this.configRepo.update(1, {
       soldeInitial: String(dto.soldeInitial),
       updatedAt: new Date(),
@@ -60,10 +102,16 @@ export class CaisseService {
 
   async create(dto: CreateCaisseTransactionDto, actor?: AuditActor): Promise<CaisseTransactionEntity> {
     const id = dto.id?.trim() || uuidv4();
+    const montant = Number(dto.montant);
+    this.assertPositiveAmount(montant);
+    const soldeProjeté = await this.computeProjectedBalance({
+      next: { type: dto.type, montant: String(montant) } as Pick<CaisseTransactionEntity, 'type' | 'montant'>,
+    });
+    this.assertCaisseBalance(soldeProjeté);
     const row = this.txRepo.create({
       id,
       type: dto.type,
-      montant: String(dto.montant),
+      montant: String(montant),
       date: dto.date.split('T')[0],
       description: dto.description,
       utilisateur: dto.utilisateur,
@@ -89,9 +137,17 @@ export class CaisseService {
   async update(id: string, dto: UpdateCaisseTransactionDto, actor?: AuditActor): Promise<CaisseTransactionEntity> {
     const existing = await this.txRepo.findOne({ where: { id } });
     if (!existing) throw new NotFoundException(`Mouvement caisse ${id} introuvable`);
+    const nextType = dto.type ?? existing.type;
+    const nextMontant = dto.montant !== undefined ? Number(dto.montant) : Number(existing.montant);
+    this.assertPositiveAmount(nextMontant);
+    const soldeProjeté = await this.computeProjectedBalance({
+      excludeIds: [id],
+      next: { type: nextType, montant: String(nextMontant) } as Pick<CaisseTransactionEntity, 'type' | 'montant'>,
+    });
+    this.assertCaisseBalance(soldeProjeté);
     const patch: Partial<CaisseTransactionEntity> = {};
     if (dto.type !== undefined) patch.type = dto.type;
-    if (dto.montant !== undefined) patch.montant = String(dto.montant);
+    if (dto.montant !== undefined) patch.montant = String(nextMontant);
     if (dto.date !== undefined) patch.date = dto.date.split('T')[0];
     if (dto.description !== undefined) patch.description = dto.description;
     if (dto.utilisateur !== undefined) patch.utilisateur = dto.utilisateur;
@@ -117,6 +173,9 @@ export class CaisseService {
 
   async remove(id: string, actor?: AuditActor): Promise<void> {
     const before = await this.txRepo.findOne({ where: { id } });
+    if (!before) throw new NotFoundException(`Mouvement caisse ${id} introuvable`);
+    const soldeProjeté = await this.computeProjectedBalance({ excludeIds: [id] });
+    this.assertCaisseBalance(soldeProjeté);
     const r = await this.txRepo.delete(id);
     if (!r.affected) throw new NotFoundException(`Mouvement caisse ${id} introuvable`);
     await this.auditLogsService.log({
@@ -156,6 +215,13 @@ export class CaisseService {
   }
 
   async removeByReference(reference: string): Promise<void> {
+    const rows = await this.txRepo.find({ where: { reference } });
+    if (rows.length > 0) {
+      const soldeProjeté = await this.computeProjectedBalance({
+        excludeIds: rows.map((row) => row.id),
+      });
+      this.assertCaisseBalance(soldeProjeté);
+    }
     await this.txRepo.delete({ reference });
   }
 }
