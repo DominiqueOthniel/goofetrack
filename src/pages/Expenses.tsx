@@ -24,6 +24,7 @@ import {
   upsertSortieFromExpense,
   validateCaisseTransaction,
 } from '@/lib/caisse-local';
+import { getTripLabel, getTripReference } from '@/lib/trip-reference';
 import { frCollator, parseDateMs, stableSort } from '@/lib/list-sort';
 import { ListSortSelect } from '@/components/ListSortSelect';
 
@@ -403,6 +404,12 @@ export default function Expenses() {
     return item ? `${item.prenom} ${item.nom}` : '-';
   };
 
+  const getTripById = (id?: string) => (id ? trips.find(t => t.id === id) : undefined);
+  const getTripDisplayLabel = (id?: string) => {
+    const trip = getTripById(id);
+    return trip ? getTripLabel(trip) : '-';
+  };
+
   const filteredExpenses = expenses.filter(exp => {
     // Filtre par camion
     if (filterCamion !== 'all') {
@@ -459,9 +466,10 @@ export default function Expenses() {
       const matchesCamion = getTruckLabel(exp.camionId).toLowerCase().includes(search);
       const matchesChauffeur = getDriverLabel(exp.chauffeurId).toLowerCase().includes(search);
       const matchesPersonnel = getPersonnelLabel(exp.personnelId).toLowerCase().includes(search);
+      const matchesTrip = getTripDisplayLabel(exp.tripId).toLowerCase().includes(search);
       const matchesFournisseur = exp.fournisseurId ? (thirdParties.find(tp => tp.id === exp.fournisseurId)?.nom || '').toLowerCase().includes(search) : false;
       
-      if (!matchesDescription && !matchesCategorie && !matchesSousCategorie && !matchesCamion && !matchesChauffeur && !matchesPersonnel && !matchesFournisseur) {
+      if (!matchesDescription && !matchesCategorie && !matchesSousCategorie && !matchesCamion && !matchesChauffeur && !matchesPersonnel && !matchesTrip && !matchesFournisseur) {
         return false;
       }
     }
@@ -550,6 +558,11 @@ export default function Expenses() {
         { header: 'Camion', value: (e) => getTruckLabel(e.camionId) },
         { header: 'Chauffeur', value: (e) => getDriverLabel(e.chauffeurId) },
         { header: 'Personnel', value: (e) => getPersonnelLabel(e.personnelId) },
+        { header: 'ID trajet', value: (e) => {
+          const trip = getTripById(e.tripId);
+          return trip ? getTripReference(trip) : '-';
+        } },
+        { header: 'Trajet', value: (e) => getTripDisplayLabel(e.tripId) },
         { header: 'Fournisseur', value: (e) => e.fournisseurId ? (thirdParties.find(tp => tp.id === e.fournisseurId)?.nom || '-') : '-' },
         { header: 'Quantité', value: (e) => e.quantite !== undefined && e.quantite > 0 ? `${e.quantite} ${getUnite(e.categorie)}` : '-' },
         { header: 'Prix unitaire (FCFA)', value: (e) => e.prixUnitaire !== undefined && e.prixUnitaire > 0 ? e.prixUnitaire : '-' },
@@ -764,7 +777,22 @@ export default function Expenses() {
               </div>
               <div>
                 <Label htmlFor="tripId">Trajet (optionnel)</Label>
-                <Select value={formData.tripId || 'none'} onValueChange={(value) => setFormData({ ...formData, tripId: value === 'none' ? '' : value })}>
+                <Select
+                  value={formData.tripId || 'none'}
+                  onValueChange={(value) => {
+                    if (value === 'none') {
+                      setFormData({ ...formData, tripId: '' });
+                      return;
+                    }
+                    const trip = trips.find(t => t.id === value);
+                    setFormData({
+                      ...formData,
+                      tripId: value,
+                      camionId: trip?.tracteurId || trip?.remorqueuseId || formData.camionId,
+                      chauffeurId: trip?.chauffeurRemplacantId || trip?.chauffeurId || formData.chauffeurId,
+                    });
+                  }}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Lier à un trajet" />
                   </SelectTrigger>
@@ -772,7 +800,7 @@ export default function Expenses() {
                     <SelectItem value="none">Aucun trajet</SelectItem>
                     {trips.map(trip => (
                       <SelectItem key={trip.id} value={trip.id}>
-                        {trip.origine} → {trip.destination} {trip.client && `(${trip.client})`} - {new Date(trip.dateDepart).toLocaleDateString('fr-FR')}
+                        {getTripLabel(trip)} - {new Date(trip.dateDepart).toLocaleDateString('fr-FR')}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -1380,9 +1408,10 @@ export default function Expenses() {
                   <TableCell>{getPersonnelLabel(expense.personnelId)}</TableCell>
                   <TableCell>
                     {expense.tripId ? (() => {
-                      const trip = trips.find(t => t.id === expense.tripId);
+                      const trip = getTripById(expense.tripId);
                       return trip ? (
                         <div className="text-xs">
+                          <div className="font-semibold text-primary">{getTripReference(trip)}</div>
                           <div className="font-medium">{trip.origine} → {trip.destination}</div>
                           {trip.client && <div className="text-muted-foreground">{trip.client}</div>}
                         </div>

@@ -21,7 +21,14 @@ import { exportToExcel, exportToPrintablePDF } from '@/lib/export-utils';
 import { EMOJI } from '@/lib/emoji-palette';
 import { frCollator, parseDateMs, stableSort } from '@/lib/list-sort';
 import { ListSortSelect } from '@/components/ListSortSelect';
-import { appendEntreeFromInvoicePayment } from '@/lib/caisse-local';
+import {
+  appendEntreeFromInvoicePayment,
+  isRemoteCaisse,
+  refreshCaisseFromApi,
+  upsertSortieFromExpense,
+  validateCaisseTransaction,
+} from '@/lib/caisse-local';
+import { getTripLabel, getTripReference } from '@/lib/trip-reference';
 
 const TRIP_STATUT_ORDER: Record<TripStatus, number> = {
   planifie: 0,
@@ -44,6 +51,8 @@ const TRIP_SORT_OPTIONS = [
   { value: 'statut_asc', label: 'Statut (planifié → annulé)' },
   { value: 'statut_desc', label: 'Statut (annulé → planifié)' },
 ] as const;
+
+const TRIP_EXPENSE_CATEGORIES = ['Carburant', 'Maintenance', 'Péage', 'Assurance', 'Autre'] as const;
 
 type GeoPoint = { lat: number; lng: number };
 
@@ -112,11 +121,14 @@ export default function Trips() {
   const [isOriginPickerOpen, setIsOriginPickerOpen] = useState(false);
   const [isDestinationPickerOpen, setIsDestinationPickerOpen] = useState(false);
   const [isExpensesDialogOpen, setIsExpensesDialogOpen] = useState(false);
+  const [isTripExpenseDialogOpen, setIsTripExpenseDialogOpen] = useState(false);
   const [isReplacementDialogOpen, setIsReplacementDialogOpen] = useState(false);
   const [selectedTripForExpenses, setSelectedTripForExpenses] = useState<Trip | null>(null);
+  const [selectedTripForNewExpense, setSelectedTripForNewExpense] = useState<Trip | null>(null);
   const [selectedTripForReplacement, setSelectedTripForReplacement] = useState<Trip | null>(null);
   const { isSubmitting, withGuard } = useSubmitGuard();
   const { isSubmitting: isInvoiceSubmitting, withGuard: withInvoiceGuard } = useSubmitGuard();
+  const { isSubmitting: isExpenseSubmitting, withGuard: withExpenseGuard } = useSubmitGuard();
   
   // États pour les filtres
   const [filterOrigin, setFilterOrigin] = useState<string>('all');
@@ -157,6 +169,14 @@ export default function Trips() {
     recetteChauffeurRemplacant: 0,
     prefinancementChauffeurInitial: 0,
     prefinancementChauffeurRemplacant: 0,
+  });
+
+  const [tripExpenseForm, setTripExpenseForm] = useState({
+    categorie: 'Carburant',
+    sousCategorie: '',
+    montant: 0,
+    date: new Date().toISOString().split('T')[0],
+    description: '',
   });
 
   // Obtenir les camions déjà en mission (trajets en cours ou planifiés)
@@ -244,6 +264,29 @@ export default function Trips() {
       prefinancementChauffeurRemplacant: 0,
     });
     setSelectedTripForReplacement(null);
+  };
+
+  const resetTripExpenseForm = () => {
+    setTripExpenseForm({
+      categorie: 'Carburant',
+      sousCategorie: '',
+      montant: 0,
+      date: new Date().toISOString().split('T')[0],
+      description: '',
+    });
+    setSelectedTripForNewExpense(null);
+  };
+
+  const openTripExpenseDialog = (trip: Trip) => {
+    setSelectedTripForNewExpense(trip);
+    setTripExpenseForm({
+      categorie: 'Carburant',
+      sousCategorie: '',
+      montant: 0,
+      date: new Date().toISOString().split('T')[0],
+      description: `Dépense trajet ${getTripReference(trip)}`,
+    });
+    setIsTripExpenseDialogOpen(true);
   };
 
   const openReplacementDialog = (trip: Trip) => {
@@ -541,6 +584,62 @@ export default function Trips() {
     });
   };
 
+  const handleSubmitTripExpense = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedTripForNewExpense) return;
+
+    const montant = Number(tripExpenseForm.montant);
+    if (!Number.isFinite(montant) || montant <= 0) {
+      toast.error('Indique un montant valide pour la dépense.');
+      return;
+    }
+    if (!tripExpenseForm.description.trim()) {
+      toast.error('Ajoute une description pour identifier la dépense.');
+      return;
+    }
+
+    if (isRemoteCaisse()) await refreshCaisseFromApi();
+    const caisseCheck = validateCaisseTransaction({
+      id: `caisse-trip-expense-preview-${Date.now()}`,
+      type: 'sortie',
+      montant,
+    });
+    if (caisseCheck.ok === false) {
+      toast.error(caisseCheck.message);
+      return;
+    }
+
+    await withExpenseGuard(async () => {
+      try {
+        const created = await createExpense({
+          camionId: selectedTripForNewExpense.tracteurId || selectedTripForNewExpense.remorqueuseId || undefined,
+          tripId: selectedTripForNewExpense.id,
+          chauffeurId:
+            selectedTripForNewExpense.chauffeurRemplacantId ||
+            selectedTripForNewExpense.chauffeurId ||
+            undefined,
+          categorie: tripExpenseForm.categorie,
+          sousCategorie: tripExpenseForm.sousCategorie || undefined,
+          montant,
+          date: tripExpenseForm.date,
+          description: `${tripExpenseForm.description.trim()} (${getTripReference(selectedTripForNewExpense)})`,
+        });
+        await upsertSortieFromExpense({
+          id: created.id,
+          montant: created.montant,
+          date: created.date,
+          description: created.description,
+          categorie: created.categorie,
+        });
+        toast.success(`Dépense ajoutée sur le trajet ${getTripReference(selectedTripForNewExpense)}`);
+        setIsTripExpenseDialogOpen(false);
+        resetTripExpenseForm();
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Erreur lors de la création de la dépense');
+      }
+    });
+  };
+
   const hasInvoice = (tripId: string) => {
     return invoices.some(inv => inv.trajetId === tripId);
   };
@@ -591,13 +690,14 @@ export default function Trips() {
         // Recherche générale (client, marchandise, description, itinéraire)
         if (searchTerm) {
           const search = searchTerm.toLowerCase();
+          const matchesReference = getTripReference(trip).toLowerCase().includes(search);
           const matchesClient = trip.client?.toLowerCase().includes(search);
           const matchesMarchandise = trip.marchandise?.toLowerCase().includes(search);
           const matchesDescription = trip.description?.toLowerCase().includes(search);
           const matchesItineraire = `${trip.origine} → ${trip.destination}`.toLowerCase().includes(search);
           const matchesChauffeur = getTripDriversLabel(trip).toLowerCase().includes(search);
           
-          if (!matchesClient && !matchesMarchandise && !matchesDescription && !matchesItineraire && !matchesChauffeur) {
+          if (!matchesReference && !matchesClient && !matchesMarchandise && !matchesDescription && !matchesItineraire && !matchesChauffeur) {
             return false;
           }
         }
@@ -795,6 +895,7 @@ export default function Trips() {
       sheetName: 'Trajets',
       filtersDescription,
       columns: [
+        { header: 'ID trajet', value: (t) => getTripReference(t) },
         { header: 'Itinéraire', value: (t) => `${t.origine} → ${t.destination}` },
         { header: 'Distance (km)', value: (t) => getTripDistanceKm(t) ?? '' },
         { header: 'Client', value: (t) => t.client || '-' },
@@ -839,6 +940,7 @@ export default function Trips() {
         { label: 'Chiffre d’affaires', value: `+${totalRecettes.toLocaleString('fr-FR')} FCFA`, style: 'positive', icon: EMOJI.argent },
       ],
       columns: [
+        { header: 'ID trajet', value: (t) => getTripReference(t) },
         { header: 'Itinéraire', value: (t) => `${EMOJI.adresse} ${t.origine} → ${t.destination}` },
         {
           header: 'Distance',
@@ -1321,7 +1423,7 @@ export default function Trips() {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   id="search"
-                  placeholder="Rechercher par client, marchandise, description, itinéraire ou chauffeur..."
+                  placeholder="Rechercher par ID trajet, client, marchandise, description, itinéraire ou chauffeur..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10"
@@ -1426,6 +1528,7 @@ export default function Trips() {
           <Table className="min-w-[900px]">
             <TableHeader>
               <TableRow>
+                <TableHead className="min-w-[120px]">ID trajet</TableHead>
                 <TableHead className="min-w-[160px]">Itinéraire</TableHead>
                 <TableHead className="min-w-[120px]">Client</TableHead>
                 <TableHead className="min-w-[180px]">Chauffeur(s)</TableHead>
@@ -1443,7 +1546,7 @@ export default function Trips() {
             <TableBody>
               {sortedTrips.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={12} className="text-center text-muted-foreground">
+                  <TableCell colSpan={13} className="text-center text-muted-foreground">
                     {trips.length === 0 
                       ? 'Aucun trajet enregistré'
                       : hasActiveFilters
@@ -1455,6 +1558,11 @@ export default function Trips() {
               ) : (
                 sortedTrips.map((trip) => (
                   <TableRow key={trip.id} className="hover:bg-muted/50 transition-colors duration-200">
+                    <TableCell>
+                      <Badge variant="outline" className="font-mono text-xs">
+                        {getTripReference(trip)}
+                      </Badge>
+                    </TableCell>
                     <TableCell className="font-medium">
                       <div>{trip.origine} → {trip.destination}</div>
                       {trip.description && <div className="text-xs text-muted-foreground mt-1">{trip.description}</div>}
@@ -1575,6 +1683,22 @@ export default function Trips() {
                               <Loader2 className="h-4 w-4 animate-spin" />
                             ) : (
                               <FileText className="h-4 w-4" />
+                            )}
+                          </Button>
+                        )}
+                        {canManageAccounting && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => openTripExpenseDialog(trip)}
+                            className="h-8 w-8 p-0"
+                            title={`Ajouter une dépense sur ${getTripReference(trip)}`}
+                            disabled={isExpenseSubmitting}
+                          >
+                            {isExpenseSubmitting ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <DollarSign className="h-4 w-4" />
                             )}
                           </Button>
                         )}
@@ -1806,6 +1930,124 @@ export default function Trips() {
         </DialogContent>
       </Dialog>
 
+      {/* Dialog d'ajout d'une dépense depuis un trajet */}
+      <Dialog
+        open={isTripExpenseDialogOpen}
+        onOpenChange={(open) => {
+          setIsTripExpenseDialogOpen(open);
+          if (!open) resetTripExpenseForm();
+        }}
+      >
+        <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              Ajouter une dépense
+              {selectedTripForNewExpense ? ` - ${getTripReference(selectedTripForNewExpense)}` : ''}
+            </DialogTitle>
+          </DialogHeader>
+          {selectedTripForNewExpense && (
+            <form onSubmit={handleSubmitTripExpense} className="space-y-4">
+              <div className="rounded-lg border bg-muted/50 p-4 text-sm">
+                <div className="flex flex-wrap items-center gap-2 mb-2">
+                  <Badge variant="outline" className="font-mono">
+                    {getTripReference(selectedTripForNewExpense)}
+                  </Badge>
+                  <span className="font-semibold">
+                    {selectedTripForNewExpense.origine} → {selectedTripForNewExpense.destination}
+                  </span>
+                </div>
+                <p className="text-muted-foreground">
+                  Camion : {getTruckLabel(selectedTripForNewExpense.tracteurId || selectedTripForNewExpense.remorqueuseId)} · Chauffeur :{' '}
+                  {getTripDriversLabel(selectedTripForNewExpense)}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="trip-expense-category">Catégorie</Label>
+                  <Select
+                    value={tripExpenseForm.categorie}
+                    onValueChange={(value) => setTripExpenseForm({ ...tripExpenseForm, categorie: value })}
+                  >
+                    <SelectTrigger id="trip-expense-category">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {TRIP_EXPENSE_CATEGORIES.map((category) => (
+                        <SelectItem key={category} value={category}>
+                          {category}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="trip-expense-subcategory">Sous-catégorie</Label>
+                  <Input
+                    id="trip-expense-subcategory"
+                    value={tripExpenseForm.sousCategorie}
+                    onChange={(e) => setTripExpenseForm({ ...tripExpenseForm, sousCategorie: e.target.value })}
+                    placeholder="Ex: Diesel, péage, réparation..."
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="trip-expense-amount">Montant</Label>
+                  <NumberInput
+                    id="trip-expense-amount"
+                    min={0}
+                    value={tripExpenseForm.montant}
+                    onChange={(value) => setTripExpenseForm({ ...tripExpenseForm, montant: value || 0 })}
+                    placeholder="Montant en FCFA"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="trip-expense-date">Date</Label>
+                  <Input
+                    id="trip-expense-date"
+                    type="date"
+                    value={tripExpenseForm.date}
+                    onChange={(e) => setTripExpenseForm({ ...tripExpenseForm, date: e.target.value })}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="trip-expense-description">Description</Label>
+                <Input
+                  id="trip-expense-description"
+                  value={tripExpenseForm.description}
+                  onChange={(e) => setTripExpenseForm({ ...tripExpenseForm, description: e.target.value })}
+                  placeholder="Ex: Carburant avant départ"
+                  required
+                />
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsTripExpenseDialogOpen(false)}
+                  disabled={isExpenseSubmitting}
+                >
+                  Annuler
+                </Button>
+                <Button type="submit" disabled={isExpenseSubmitting}>
+                  {isExpenseSubmitting ? (
+                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Enregistrement...</>
+                  ) : (
+                    'Ajouter la dépense'
+                  )}
+                </Button>
+              </div>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* Dialog de consultation des dépenses d'un trajet */}
       <Dialog open={isExpensesDialogOpen} onOpenChange={setIsExpensesDialogOpen}>
         <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -1821,6 +2063,10 @@ export default function Trips() {
                 {/* Informations du trajet */}
                 <div className="bg-muted/50 rounded-lg p-4 border border-border">
                   <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
+                    <div>
+                      <span className="text-muted-foreground">ID trajet:</span>
+                      <p className="font-mono font-semibold text-primary">{getTripReference(selectedTripForExpenses)}</p>
+                    </div>
                     <div>
                       <span className="text-muted-foreground">Itinéraire:</span>
                       <p className="font-semibold">{selectedTripForExpenses.origine} → {selectedTripForExpenses.destination}</p>
