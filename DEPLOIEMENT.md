@@ -42,15 +42,24 @@ Dans **Site settings → Environment variables** :
 
 | Variable | Valeur |
 |---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | l'URL du projet Supabase |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | la clé anon / public |
+| `SUPABASE_URL` | l'URL du projet Supabase |
+| `SUPABASE_SERVICE_ROLE_KEY` | la clé **service_role** (Project Settings → API) |
 
 Ces deux variables suffisent. Toute variable `VITE_API_URL` héritée de
 l'ancienne architecture peut être supprimée : elle n'est plus lue.
 
-Les valeurs `NEXT_PUBLIC_*` sont visibles dans le navigateur, ce qui est le
-fonctionnement normal de Supabase : la protection des données repose sur les
-politiques RLS, pas sur le secret de la clé anon.
+**Pourquoi la clé `service_role` et non la clé `anon`, et pourquoi sans préfixe
+`NEXT_PUBLIC_`** : seules les routes API interrogent la base, et elles tournent
+côté serveur. Une variable `NEXT_PUBLIC_*` serait au contraire intégrée au
+bundle JavaScript envoyé au navigateur, donc lisible par n'importe quel
+visiteur. Comme l'application n'impose aucune authentification sur ses routes,
+une clé exposée permettrait d'écrire directement en base. Le schéma active donc
+RLS sans aucune politique : tout accès direct depuis un navigateur est refusé,
+et seule la clé `service_role`, qui contourne RLS, fonctionne côté serveur.
+
+Les anciens noms `NEXT_PUBLIC_SUPABASE_URL` et `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+restent acceptés pour ne pas casser un déploiement existant, mais la clé anon
+seule sera refusée par RLS.
 
 ---
 
@@ -80,6 +89,10 @@ curl https://votre-site.netlify.app/api/trucks
 
 Si `/api/health` répond mais que les autres routes renvoient
 `Supabase non configure`, les variables d'environnement ne sont pas définies.
+
+Si les routes répondent `[]` alors que la base contient des données, c'est que
+la clé utilisée est la clé `anon` : RLS bloque la lecture. Remplacez-la par la
+clé `service_role`.
 
 ---
 

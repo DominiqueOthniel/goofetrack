@@ -301,3 +301,28 @@ DROP TRIGGER IF EXISTS bank_transactions_recalc ON bank_transactions;
 CREATE TRIGGER bank_transactions_recalc
 AFTER INSERT OR UPDATE OR DELETE ON bank_transactions
 FOR EACH ROW EXECUTE FUNCTION trg_bank_tx_recalc();
+
+-- Securite : RLS active sans aucune politique.
+--
+-- Seules les routes API Next.js accedent a la base, avec la cle service_role,
+-- qui contourne RLS. Aucune politique n'est donc necessaire, et l'absence de
+-- politique bloque tout acces direct depuis un navigateur.
+--
+-- Consequence : la cle anon seule ne suffit pas, l'API doit utiliser
+-- SUPABASE_SERVICE_ROLE_KEY.
+ALTER TABLE third_parties ENABLE ROW LEVEL SECURITY;
+ALTER TABLE personnel ENABLE ROW LEVEL SECURITY;
+ALTER TABLE drivers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE driver_transactions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE trucks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE trips ENABLE ROW LEVEL SECURITY;
+ALTER TABLE expenses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE invoices ENABLE ROW LEVEL SECURITY;
+ALTER TABLE bank_accounts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE bank_transactions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE caisse_config ENABLE ROW LEVEL SECURITY;
+ALTER TABLE caisse_transactions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE credits ENABLE ROW LEVEL SECURITY;
+ALTER TABLE credit_remboursements ENABLE ROW LEVEL SECURITY;
+ALTER TABLE parcel_expeditions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
