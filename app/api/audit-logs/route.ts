@@ -3,6 +3,8 @@ import { supabase } from '@/lib/db/supabase';
 import { successResponse, errorResponse, serverErrorResponse } from '@/lib/api-response';
 import { v4 as uuidv4 } from 'uuid';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
