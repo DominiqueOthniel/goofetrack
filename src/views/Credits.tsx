@@ -39,8 +39,8 @@ const CREDIT_SORT_OPTIONS = [
  */
 const CREDITS_KEY = 'credits_data';
 
-/** Si VITE_API_URL est défini, les crédits sont lus/écrits via l’API (tables Supabase). */
-const USE_CREDITS_API = Boolean(import.meta.env.VITE_API_URL?.trim());
+/** Les crédits sont lus/écrits via les routes API Next.js (tables Supabase). */
+const USE_CREDITS_API = true;
 
 export type CreditStatut = 'en_cours' | 'solde' | 'en_retard';
 export type CreditType = 'emprunt' | 'pret_accorde';

@@ -4,17 +4,10 @@
  */
 
 /**
- * URL de base incluant `/api`. Si VITE_API_URL est `https://host` sans `/api`,
- * on l’ajoute — sinon les appels partent vers `/caisse/...` et le serveur répond
- * « Cannot GET /caisse/... » (404).
+ * Les routes API sont servies par Next.js sur la meme origine que le front,
+ * une URL relative suffit donc et evite toute question de CORS.
  */
-function getApiBaseUrl(): string {
-  const raw = (import.meta.env.VITE_API_URL || 'http://localhost:3000').trim();
-  const base = raw.replace(/\/+$/, '');
-  return base.endsWith('/api') ? base : `${base}/api`;
-}
-
-const API_URL = getApiBaseUrl();
+const API_URL = '/api';
 
 /** Contexte utilisateur courant pour le journal d’audit côté API (en-têtes x-actor-*). */
 let apiActor: { login?: string; role?: string } | null = null;

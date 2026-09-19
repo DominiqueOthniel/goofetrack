@@ -33,9 +33,9 @@ function parseNum(val: unknown): number {
   return 0;
 }
 
-/** True si le front doit persister la caisse via l’API (backend → Supabase). */
+/** La caisse est persistee via les routes API Next.js, donc toujours distante. */
 export function isRemoteCaisse(): boolean {
-  return Boolean(import.meta.env.VITE_API_URL?.trim());
+  return true;
 }
 
 let _txCache: CaisseTransaction[] = [];

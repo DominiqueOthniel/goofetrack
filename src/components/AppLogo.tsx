@@ -1,7 +1,7 @@
 import { cn } from '@/lib/utils';
 
 /** Logo applicatif — fichier servi depuis `public/logotruck.jpg`. */
-export const APP_LOGO_SRC = `${import.meta.env.BASE_URL}logotruck.jpg`;
+export const APP_LOGO_SRC = '/logotruck.jpg';
 
 type AppLogoVariant = 'login' | 'sidebar' | 'header' | 'compact' | 'hero';
 
