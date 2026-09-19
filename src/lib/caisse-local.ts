@@ -1,5 +1,5 @@
 /**
- * Caisse : localStorage (hors ligne / démo) ou API Nest + Supabase si VITE_API_URL est défini.
+ * Caisse : persistée via les routes API Next.js (Supabase), avec un cache localStorage.
  */
 
 import { caisseApi, type CaisseTransactionPayload } from '@/lib/api';

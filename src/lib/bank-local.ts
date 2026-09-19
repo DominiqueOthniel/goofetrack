@@ -1,5 +1,5 @@
 /**
- * Comptes / transactions bancaires : localStorage hors ligne, ou API Nest + Supabase si VITE_API_URL.
+ * Comptes / transactions bancaires : routes API Next.js (Supabase), avec un cache localStorage.
  */
 import type { BankAccount, BankTransaction } from '@/lib/bank-types';
 import { bankApi } from '@/lib/api';

@@ -32,7 +32,10 @@ cd <YOUR_PROJECT_NAME>
 # Step 3: Install the necessary dependencies.
 npm i
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Step 4: Configure Supabase credentials.
+cp .env.example .env.local
+
+# Step 5: Start the development server with auto-reloading and an instant preview.
 npm run dev
 ```
 
@@ -54,11 +57,14 @@ npm run dev
 
 This project is built with:
 
-- Vite
+- Next.js 14 (App Router, frontend and API routes in one deployment)
 - TypeScript
 - React
 - shadcn-ui
 - Tailwind CSS
+- Supabase (PostgreSQL)
+
+Deployment and local setup are documented in [DEPLOIEMENT.md](./DEPLOIEMENT.md).
 
 ## How can I deploy this project?
 

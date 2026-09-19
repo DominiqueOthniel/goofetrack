@@ -110,7 +110,7 @@ export default function Caisse() {
         }
       } catch (e) {
         console.error(e);
-        toast.error('Impossible de charger la caisse (vérifiez le backend et VITE_API_URL).');
+        toast.error('Impossible de charger la caisse (vérifiez la configuration Supabase).');
       }
     })();
     return () => {

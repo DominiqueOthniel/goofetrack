@@ -1,115 +1,115 @@
-# Guide de Déploiement — SIA-GOOFE
+# Guide de déploiement — SIA-GOOFE
 
-## Stack de production
-- **Frontend** : Netlify (gratuit)
-- **Backend** : Render Frankfurt (gratuit avec veille)
-- **Base de données** : Supabase EU (gratuit, 500MB)
-- **Keep-alive** : UptimeRobot (gratuit, évite la veille Render)
+## Architecture
 
----
-
-## Étape 1 — Supabase (Base de données)
-
-1. Aller sur [supabase.com](https://supabase.com) → **New Project**
-2. Choisir la région : **Frankfurt (EU Central)**
-3. Donner un mot de passe fort à la base
-4. Attendre la création (~2 minutes)
-5. Aller dans **Project Settings → Database → Connection string**
-6. Choisir **URI** (mode Transaction Pooler - port 6543)
-7. Copier l'URL — elle ressemble à :
-   ```
-   postgresql://postgres.xxxx:[PASSWORD]@aws-0-eu-central-1.pooler.supabase.com:6543/postgres
-   ```
-8. Garder cette URL pour l'étape suivante
-
----
-
-## Étape 2 — Render (Backend NestJS)
-
-1. Aller sur [render.com](https://render.com) → **New Web Service**
-2. Connecter ton repo GitHub : `DominiqueOthniel/goofe`
-3. Configurer :
-   - **Root Directory** : `backend`
-   - **Region** : **Frankfurt (EU)**
-   - **Build Command** : `npm install && npm run build`
-   - **Start Command** : `npm run start:prod`
-   - **Plan** : Free
-4. Ajouter les **Environment Variables** :
-   | Variable | Valeur |
-   |---|---|
-   | `NODE_ENV` | `production` |
-   | `DATABASE_URL` | *(l'URL Supabase copiée à l'étape 1)* |
-   | `DB_SYNCHRONIZE` | `true` *(mettre `false` après le 1er déploiement)* |
-   | `FRONTEND_URL` | *(l'URL Netlify — à remplir après l'étape 3)* |
-   | `PORT` | `3000` |
-5. Cliquer **Deploy** → attendre ~3-5 minutes
-6. Copier l'URL du service : `https://goofe-api.onrender.com`
-
-> ⚠️ Après le premier déploiement réussi, repasser `DB_SYNCHRONIZE` à `false` dans les variables Render.
-
----
-
-## Étape 3 — Netlify (Frontend React)
-
-1. Aller sur [netlify.com](https://netlify.com) → **Add new site → Import from Git**
-2. Connecter le repo GitHub : `DominiqueOthniel/goofe`
-3. Configurer :
-   - **Base directory** : *(laisser vide — racine du repo)*
-   - **Build command** : `npm run build`
-   - **Publish directory** : `dist`
-4. Ajouter la **variable d'environnement** :
-   | Variable | Valeur |
-   |---|---|
-   | `VITE_API_URL` | `https://goofe-api.onrender.com/api` |
-5. Cliquer **Deploy site**
-6. Copier l'URL Netlify : `https://goofe-xxx.netlify.app`
-
----
-
-## Étape 4 — Finaliser le CORS sur Render
-
-1. Retourner sur Render → ton service backend
-2. Dans **Environment Variables**, mettre à jour :
-   | Variable | Valeur |
-   |---|---|
-   | `FRONTEND_URL` | `https://goofe-xxx.netlify.app` |
-3. Render redéploie automatiquement
-
----
-
-## Étape 5 — UptimeRobot (Éviter la veille Render)
-
-1. Aller sur [uptimerobot.com](https://uptimerobot.com) → créer un compte gratuit
-2. **New Monitor** :
-   - Type : **HTTP(s)**
-   - Name : `SIA-GOOFE API`
-   - URL : `https://goofe-api.onrender.com/api/health`
-   - Interval : **5 minutes**
-3. Sauvegarder → ton backend ne dormira plus jamais ✅
-
----
-
-## Récapitulatif des URLs finales
+L'application est un projet **Next.js 14** unique : le frontend React et l'API
+sont servis par la même application, sur la même origine.
 
 ```
-Frontend  : https://goofe-xxx.netlify.app
-Backend   : https://goofe-api.onrender.com/api
-Health    : https://goofe-api.onrender.com/api/health
+Next.js (app/ + src/)  ->  Netlify  ->  Supabase (PostgreSQL)
 ```
+
+- **Frontend** : l'application React existante (`src/`) est montée par la route
+  attrape-tout `app/[[...slug]]/page.tsx`, côté navigateur uniquement.
+- **API** : les routes `app/api/**` remplacent l'ancien backend NestJS.
+- **Base de données** : Supabase, interrogée via `@supabase/supabase-js`.
+
+Il n'y a plus de service backend séparé : ni Render, ni Railway, ni Koyeb. Le
+dossier `backend/` est conservé à titre de référence mais n'est plus déployé.
+
+---
+
+## Étape 1 — Supabase
+
+1. Créer un projet sur [supabase.com](https://supabase.com), région **Frankfurt (EU Central)**.
+2. Ouvrir **SQL Editor**, puis exécuter le contenu de `supabase-schema.sql`.
+3. Relever les identifiants dans **Project Settings → API** :
+   - **Project URL**
+   - clé **anon / public**
+
+> Les colonnes composées sont en camelCase et donc entre guillemets dans le
+> schéma (`"dateMiseEnCirculation"`). C'est le nommage créé par l'ancien backend
+> TypeORM : il est conservé pour rester compatible avec une base existante.
+
+Si votre base a déjà été alimentée par l'ancien backend NestJS, il n'y a rien à
+exécuter : le schéma est identique.
+
+---
+
+## Étape 2 — Variables d'environnement Netlify
+
+Dans **Site settings → Environment variables** :
+
+| Variable | Valeur |
+|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | l'URL du projet Supabase |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | la clé anon / public |
+
+Ces deux variables suffisent. Toute variable `VITE_API_URL` héritée de
+l'ancienne architecture peut être supprimée : elle n'est plus lue.
+
+Les valeurs `NEXT_PUBLIC_*` sont visibles dans le navigateur, ce qui est le
+fonctionnement normal de Supabase : la protection des données repose sur les
+politiques RLS, pas sur le secret de la clé anon.
+
+---
+
+## Étape 3 — Déploiement
+
+1. Sur [netlify.com](https://netlify.com) : **Add new site → Import from Git**.
+2. Sélectionner le dépôt. La configuration est déjà dans `netlify.toml` :
+   - commande de build : `npm run build`
+   - dossier publié : `.next`
+   - extension `@netlify/plugin-nextjs`
+3. **Deploy site**.
+
+Chaque `git push` sur `main` déclenche un déploiement, et chaque pull request
+obtient une URL de prévisualisation.
+
+---
+
+## Vérification après déploiement
+
+```bash
+curl https://votre-site.netlify.app/api/health
+# {"status":"ok"}
+
+curl https://votre-site.netlify.app/api/trucks
+# [] sur une base vide, sinon la liste des camions
+```
+
+Si `/api/health` répond mais que les autres routes renvoient
+`Supabase non configure`, les variables d'environnement ne sont pas définies.
 
 ---
 
 ## Développement local
 
 ```bash
-# Frontend
 npm install
-npm run dev          # http://localhost:3001
-
-# Backend
-cd backend
-npm install
-npm run start:dev    # http://localhost:3000/api
+cp .env.example .env.local   # puis renseigner les deux variables Supabase
+npm run dev                  # http://localhost:3001
 ```
 
-Copier les fichiers `.env.example` en `.env` et remplir les valeurs.
+Autres commandes utiles :
+
+```bash
+npm run build           # build de production
+npx tsc --noEmit        # vérification des types
+npm run verify:schema   # execute supabase-schema.sql dans PGlite et controle
+                        # que chaque table et colonne utilisee par le code existe
+```
+
+---
+
+## Points d'attention
+
+- **Suppressions** : les routes `DELETE` renvoient `204` sans corps.
+- **Erreurs** : le corps d'erreur est `{ "message": "..." }`, format lu par le
+  client API du frontend.
+- **Journal d'audit** : les mutations écrivent dans `audit_logs` à partir des
+  en-têtes `x-actor-login` et `x-actor-role`. Une écriture d'audit qui échoue
+  n'interrompt jamais l'opération métier.
+- **Montants** : PostgreSQL renvoie les colonnes `numeric` sous forme de chaîne.
+  Le frontend accepte `number | string`, ne pas « corriger » ce point sans
+  vérifier les normaliseurs de `src/contexts/AppContext.tsx`.
