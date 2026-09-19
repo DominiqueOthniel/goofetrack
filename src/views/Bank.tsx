@@ -17,7 +17,7 @@ import { isBankCreditType, isBankDebitType } from '@/lib/bank-rules';
 import { calculateAccountBalance } from '@/lib/bank-local';
 import { formatMovementUserLabel } from '@/lib/movement-user';
 import { DataTableSortSelect } from '@/components/DataTableSortSelect';
-import { frSort, mergeTriIntoDescription } from '@/lib/list-sort';
+import { frCollator, mergeTriIntoDescription } from '@/lib/list-sort';
 
 const BANK_SORT_OPTIONS = [
   { value: 'date_desc', label: 'Date : récent → ancien' },
@@ -341,9 +341,9 @@ export default function Bank() {
       case 'montant_asc':
         return arr.sort((a, b) => a.montant - b.montant);
       case 'description_az':
-        return arr.sort((a, b) => frSort.compare(a.description, b.description));
+        return arr.sort((a, b) => frCollator.compare(a.description, b.description));
       case 'compte_az':
-        return arr.sort((a, b) => frSort.compare(accountName(a.compteId), accountName(b.compteId)));
+        return arr.sort((a, b) => frCollator.compare(accountName(a.compteId), accountName(b.compteId)));
       case 'type':
         return arr.sort((a, b) => {
           const oa = BANK_TYPE_ORDER[a.type] ?? 99;

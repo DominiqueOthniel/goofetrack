@@ -659,7 +659,7 @@ export default function ParcelShipping() {
           icon: EMOJI.liste,
         },
         { label: 'En cours + planifiées', value: counts.planifie + counts.en_cours, style: 'neutral', icon: EMOJI.date },
-        { label: 'Terminées', value: counts.termine, style: 'positive', icon: EMOJI.ok },
+        { label: 'Terminées', value: counts.termine, style: 'positive', icon: EMOJI.termine },
       ],
       columns: [
         { header: 'Réf.', value: (ex) => ex.reference },

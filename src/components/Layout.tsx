@@ -63,7 +63,7 @@ function NavItem({
   isActive,
   onClick,
 }: {
-  item: typeof navigation[0];
+  item: NavEntry;
   isActive: boolean;
   onClick?: () => void;
 }) {

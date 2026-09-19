@@ -20,6 +20,19 @@ export function stableSort<T>(items: readonly T[], compare: (a: T, b: T) => numb
     .map((x) => x.item);
 }
 
+/**
+ * Ajoute le libellé de tri à la description des filtres d’un export, en suivant
+ * le format « Filtres appliqués: … , Tri: … » utilisé par les autres écrans.
+ */
+export function mergeTriIntoDescription(
+  description: string | undefined,
+  triLabel: string | undefined,
+): string | undefined {
+  const tri = triLabel?.trim();
+  if (!tri) return description;
+  return description ? `${description}, Tri: ${tri}` : `Tri: ${tri}`;
+}
+
 export function compareAsc(a: number, b: number): number {
   return a - b;
 }

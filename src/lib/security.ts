@@ -106,8 +106,8 @@ export async function decryptData(
 /**
  * Convertit un ArrayBuffer en base64
  */
-function arrayBufferToBase64(buffer: ArrayBuffer): string {
-  const bytes = new Uint8Array(buffer);
+function arrayBufferToBase64(buffer: ArrayBuffer | Uint8Array): string {
+  const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
   let binary = '';
   for (let i = 0; i < bytes.byteLength; i++) {
     binary += String.fromCharCode(bytes[i]);
@@ -124,7 +124,7 @@ function base64ToArrayBuffer(base64: string): ArrayBuffer {
   for (let i = 0; i < binary.length; i++) {
     bytes[i] = binary.charCodeAt(i);
   }
-  return bytes.buffer;
+  return bytes.buffer as ArrayBuffer;
 }
 
 /**
@@ -145,7 +145,7 @@ export async function storeEncryptedData(
       salt = base64ToArrayBuffer(storedSalt) as unknown as Uint8Array;
     } else {
       salt = generateSalt();
-      localStorage.setItem(saltKey, arrayBufferToBase64(salt.buffer));
+      localStorage.setItem(saltKey, arrayBufferToBase64(salt));
     }
 
     // Dérive la clé

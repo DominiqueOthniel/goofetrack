@@ -318,7 +318,7 @@ export default function Caisse() {
           descriptionCaisse: formData.description,
           caisseTransactionId: editingTransaction.id,
         });
-        if (!result.ok) {
+        if (result.ok === false) {
           if (oldBankTx) await recreateBankTransaction(oldBankTx);
           toast.error(result.message);
           return;
@@ -369,7 +369,7 @@ export default function Caisse() {
         descriptionCaisse: formData.description,
         caisseTransactionId: newId,
       });
-      if (!result.ok) {
+      if (result.ok === false) {
         toast.error(result.message);
         return;
       }
