@@ -1,11 +1,8 @@
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
 import './globals.css';
 
-const inter = Inter({ subsets: ['latin'] });
-
 export const metadata: Metadata = {
-  title: 'SIA-GOOFE - Gestion de Flotte',
+  title: 'SIA-GOOFE',
   description: 'Application de gestion de flotte de transport',
 };
 
@@ -15,8 +12,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="fr">
-      <body className={inter.className}>{children}</body>
+    <html lang="fr" suppressHydrationWarning>
+      <body>{children}</body>
     </html>
   );
 }
