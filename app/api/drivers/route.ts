@@ -1,52 +1,64 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { randomUUID } from 'node:crypto';
+import { NextRequest } from 'next/server';
 import { supabase } from '@/lib/db/supabase';
-import { successResponse, errorResponse, serverErrorResponse } from '@/lib/api-response';
-import { v4 as uuidv4 } from 'uuid';
+import { listHandler } from '@/lib/crud';
+import { driversResource } from '@/lib/resources';
+import { readActor, recordAudit } from '@/lib/audit';
+import {
+  createdResponse,
+  errorResponse,
+  readJsonBody,
+  supabaseErrorResponse,
+  unexpectedErrorResponse,
+} from '@/lib/api-response';
+import { fetchDriver, readTransactionsInput, replaceDriverTransactions } from '@/lib/driver-transactions';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(request: NextRequest) {
-  try {
-    const { data, error } = await supabase
-      .from('drivers')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('Supabase error:', error);
-      return errorResponse(error.message, 500);
-    }
-
-    return successResponse(data || []);
-  } catch (err: any) {
-    console.error('Error fetching drivers:', err);
-    return serverErrorResponse(err.message);
-  }
-}
+export const GET = listHandler(driversResource);
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    
-    const newDriver = {
-      id: uuidv4(),
-      ...body,
-    };
+    const body = await readJsonBody(request);
+    const transactions = readTransactionsInput(body);
+    const id = randomUUID();
 
-    const { data, error } = await supabase
-      .from('drivers')
-      .insert([newDriver])
-      .select()
-      .single();
+    const { error } = await supabase.from('drivers').insert([
+      {
+        id,
+        nom: body.nom,
+        prenom: body.prenom,
+        telephone: body.telephone,
+        cni: body.cni ?? null,
+        numeroPermis: body.numeroPermis ?? null,
+        photo: body.photo ?? null,
+      },
+    ]);
 
-    if (error) {
-      console.error('Supabase error:', error);
-      return errorResponse(error.message, 500);
+    if (error) return supabaseErrorResponse(error);
+
+    if (transactions && transactions.length > 0) {
+      const transactionError = await replaceDriverTransactions(id, transactions);
+      if (transactionError) return errorResponse(transactionError, 500);
     }
 
-    return successResponse(data, 201);
-  } catch (err: any) {
-    console.error('Error creating driver:', err);
-    return serverErrorResponse(err.message);
+    const { data, error: readError } = await fetchDriver(id);
+    if (readError) return supabaseErrorResponse(readError);
+
+    await recordAudit({
+      module: driversResource.module,
+      action: 'CREATE',
+      entityId: id,
+      actor: readActor(request),
+      summary: `${body.nom ?? ''} ${body.prenom ?? ''}`.trim(),
+      after: data,
+    });
+
+    return createdResponse(data);
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('JSON')) {
+      return errorResponse(error.message, 400);
+    }
+    return unexpectedErrorResponse(error);
   }
 }

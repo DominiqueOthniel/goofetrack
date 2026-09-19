@@ -1,56 +1,47 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { supabase } from '@/lib/db/supabase';
-import { successResponse, errorResponse, serverErrorResponse } from '@/lib/api-response';
-import { v4 as uuidv4 } from 'uuid';
+import { createHandler } from '@/lib/crud';
+import { parcelExpeditionsResource } from '@/lib/resources';
+import { successResponse, supabaseErrorResponse, unexpectedErrorResponse } from '@/lib/api-response';
 
 export const dynamic = 'force-dynamic';
 
+export const POST = createHandler(parcelExpeditionsResource);
+
+const EXACT_FILTERS = ['statut', 'chauffeurId', 'tracteurId', 'remorqueuseId'] as const;
+
 export async function GET(request: NextRequest) {
   try {
-    const { data, error } = await supabase
-      .from('parcel_expeditions')
-      .select(`
-        *,
-        tracteur:trucks!tracteurId(*),
-        chauffeur:drivers!chauffeurId(*)
-      `)
-      .order('dateExpedition', { ascending: false });
+    const { searchParams } = new URL(request.url);
+    let query = supabase.from('parcel_expeditions').select('*');
 
-    if (error) {
-      console.error('Supabase error:', error);
-      return errorResponse(error.message, 500);
+    for (const filter of EXACT_FILTERS) {
+      const value = searchParams.get(filter);
+      if (value) query = query.eq(filter, value);
     }
 
-    return successResponse(data || []);
-  } catch (err: any) {
-    console.error('Error fetching parcel expeditions:', err);
-    return serverErrorResponse(err.message);
-  }
-}
+    const destination = searchParams.get('destination');
+    if (destination) query = query.ilike('destination', `%${destination}%`);
 
-export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json();
-    
-    const newExpedition = {
-      id: uuidv4(),
-      ...body,
-    };
+    const dateDepartFrom = searchParams.get('dateDepartFrom');
+    if (dateDepartFrom) query = query.gte('dateDepart', dateDepartFrom);
 
-    const { data, error } = await supabase
-      .from('parcel_expeditions')
-      .insert([newExpedition])
-      .select()
-      .single();
+    const dateDepartTo = searchParams.get('dateDepartTo');
+    if (dateDepartTo) query = query.lte('dateDepart', dateDepartTo);
 
-    if (error) {
-      console.error('Supabase error:', error);
-      return errorResponse(error.message, 500);
+    const search = searchParams.get('q');
+    if (search) {
+      const pattern = `%${search}%`;
+      query = query.or(
+        `reference.ilike.${pattern},origine.ilike.${pattern},destination.ilike.${pattern}`,
+      );
     }
 
-    return successResponse(data, 201);
-  } catch (err: any) {
-    console.error('Error creating parcel expedition:', err);
-    return serverErrorResponse(err.message);
+    const { data, error } = await query.order('dateDepart', { ascending: false });
+    if (error) return supabaseErrorResponse(error);
+
+    return successResponse(data ?? []);
+  } catch (error) {
+    return unexpectedErrorResponse(error);
   }
 }

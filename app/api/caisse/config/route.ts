@@ -1,53 +1,77 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { supabase } from '@/lib/db/supabase';
-import { successResponse, errorResponse, serverErrorResponse } from '@/lib/api-response';
-import { v4 as uuidv4 } from 'uuid';
+import { CAISSE_CONFIG_ID } from '@/lib/caisse';
+import { readActor, recordAudit } from '@/lib/audit';
+import {
+  errorResponse,
+  readJsonBody,
+  successResponse,
+  supabaseErrorResponse,
+  unexpectedErrorResponse,
+} from '@/lib/api-response';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const { data, error } = await supabase
       .from('caisse_config')
-      .select('*')
-      .limit(1)
-      .single();
+      .select('id, soldeInitial')
+      .eq('id', CAISSE_CONFIG_ID)
+      .maybeSingle();
 
-    if (error && error.code !== 'PGRST116') {
-      console.error('Supabase error:', error);
-      return errorResponse(error.message, 500);
-    }
+    if (error) return supabaseErrorResponse(error);
 
-    return successResponse(data || null);
-  } catch (err: any) {
-    console.error('Error fetching caisse config:', err);
-    return serverErrorResponse(err.message);
+    return successResponse({
+      id: Number(data?.id ?? CAISSE_CONFIG_ID),
+      soldeInitial: Number(data?.soldeInitial ?? 0),
+    });
+  } catch (error) {
+    return unexpectedErrorResponse(error);
   }
 }
 
-export async function POST(request: NextRequest) {
+export async function PATCH(request: NextRequest) {
   try {
-    const body = await request.json();
-    
-    const newConfig = {
-      id: uuidv4(),
-      ...body,
-    };
+    const body = await readJsonBody(request);
+    const soldeInitial = Number(body.soldeInitial ?? 0);
+
+    if (!Number.isFinite(soldeInitial)) {
+      return errorResponse('Le solde initial doit etre un nombre.', 400);
+    }
 
     const { data, error } = await supabase
       .from('caisse_config')
-      .insert([newConfig])
-      .select()
+      .upsert(
+        {
+          id: CAISSE_CONFIG_ID,
+          soldeInitial,
+          updatedAt: new Date().toISOString(),
+        },
+        { onConflict: 'id' },
+      )
+      .select('id, soldeInitial')
       .single();
 
-    if (error) {
-      console.error('Supabase error:', error);
-      return errorResponse(error.message, 500);
-    }
+    if (error) return supabaseErrorResponse(error);
 
-    return successResponse(data, 201);
-  } catch (err: any) {
-    console.error('Error creating caisse config:', err);
-    return serverErrorResponse(err.message);
+    await recordAudit({
+      module: 'caisse',
+      action: 'UPDATE',
+      entityId: String(CAISSE_CONFIG_ID),
+      actor: readActor(request),
+      summary: `Solde initial porte a ${soldeInitial}`,
+      after: data,
+    });
+
+    return successResponse({
+      id: Number(data.id),
+      soldeInitial: Number(data.soldeInitial ?? 0),
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('JSON')) {
+      return errorResponse(error.message, 400);
+    }
+    return unexpectedErrorResponse(error);
   }
 }

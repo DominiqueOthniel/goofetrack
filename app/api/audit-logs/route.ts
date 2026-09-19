@@ -1,57 +1,46 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { supabase } from '@/lib/db/supabase';
-import { successResponse, errorResponse, serverErrorResponse } from '@/lib/api-response';
-import { v4 as uuidv4 } from 'uuid';
+import { successResponse, supabaseErrorResponse, unexpectedErrorResponse } from '@/lib/api-response';
 
 export const dynamic = 'force-dynamic';
+
+const DEFAULT_LIMIT = 200;
+const MAX_LIMIT = 1000;
+
+function parseLimit(raw: string | null): number {
+  const parsed = Number.parseInt(raw ?? '', 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_LIMIT;
+  return Math.min(parsed, MAX_LIMIT);
+}
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const limit = parseInt(searchParams.get('limit') || '100');
+    let query = supabase.from('audit_logs').select('*');
 
-    const { data, error } = await supabase
-      .from('audit_logs')
-      .select('*')
-      .order('timestamp', { ascending: false })
-      .limit(limit);
+    const module = searchParams.get('module');
+    if (module) query = query.eq('module', module);
 
-    if (error) {
-      console.error('Supabase error:', error);
-      return errorResponse(error.message, 500);
-    }
+    const action = searchParams.get('action');
+    if (action) query = query.eq('action', action);
 
-    return successResponse(data || []);
-  } catch (err: any) {
-    console.error('Error fetching audit logs:', err);
-    return serverErrorResponse(err.message);
-  }
-}
+    const actorLogin = searchParams.get('actorLogin');
+    if (actorLogin) query = query.eq('actorLogin', actorLogin);
 
-export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json();
-    
-    const newLog = {
-      id: uuidv4(),
-      timestamp: new Date().toISOString(),
-      ...body,
-    };
+    const from = searchParams.get('from');
+    if (from) query = query.gte('createdAt', from);
 
-    const { data, error } = await supabase
-      .from('audit_logs')
-      .insert([newLog])
-      .select()
-      .single();
+    const to = searchParams.get('to');
+    if (to) query = query.lte('createdAt', to);
 
-    if (error) {
-      console.error('Supabase error:', error);
-      return errorResponse(error.message, 500);
-    }
+    const { data, error } = await query
+      .order('createdAt', { ascending: false })
+      .limit(parseLimit(searchParams.get('limit')));
 
-    return successResponse(data, 201);
-  } catch (err: any) {
-    console.error('Error creating audit log:', err);
-    return serverErrorResponse(err.message);
+    if (error) return supabaseErrorResponse(error);
+
+    return successResponse(data ?? []);
+  } catch (error) {
+    return unexpectedErrorResponse(error);
   }
 }
